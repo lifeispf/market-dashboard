@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from engine.core.contracts import ModuleOutput
+from engine.sector.classification import classify
 
 if TYPE_CHECKING:
     from engine.core.context import Context
@@ -73,6 +74,7 @@ class SectorRelativeStrengthModule:
                 inputs={
                     "rs_ratio": data.rs_ratio, "rs_momentum": data.rs_momentum,
                     "quadrant": quadrant, "approximation": "single_window",
+                    "risk_profile": classify(entity_id),
                 },
             )
 
@@ -87,5 +89,6 @@ class SectorRelativeStrengthModule:
             inputs={
                 "rs_ratio": data.rs_ratio, "rs_momentum": data.rs_momentum,
                 "quadrant": quadrant, "approximation": "single_window",
+                "risk_profile": classify(entity_id),
             },
         )

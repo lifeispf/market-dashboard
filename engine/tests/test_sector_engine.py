@@ -14,6 +14,7 @@ import unittest
 
 from engine.core.context import Context
 from engine.core.contracts import EngineOutput, Verdict
+from engine.sector.classification import classify
 from engine.sector.engine import build_sector_engine, run_sectors
 from engine.sector.inputs import SectorRow, sector_rows_to_payload
 
@@ -58,6 +59,10 @@ class SectorRelativeStrengthMappingTests(unittest.TestCase):
         self.assertEqual(out.verdict.lead_pattern, "Breakdown")
         self.assertEqual(out.modules[0].state, "Lagging")
 
+    def test_leading_has_offensive_risk_profile(self):
+        out = self._run_one("leading")
+        self.assertEqual(out.verdict.extra["risk_profile"], "offensive")
+
     def test_none_quadrant_degrades_safely(self):
         out = self._run_one(None, rs_ratio=None, rs_momentum=None)
         self.assertEqual(out.verdict.direction, "neutral")
@@ -65,6 +70,8 @@ class SectorRelativeStrengthMappingTests(unittest.TestCase):
         self.assertIsNone(out.modules[0].state)
         # mode must be "degraded" when the module observed nothing.
         self.assertEqual(out.mode, "degraded")
+        # risk_profile is static classification metadata — must survive degrade.
+        self.assertEqual(out.verdict.extra["risk_profile"], "offensive")
 
     def test_macro_upstream_noted_in_narrative(self):
         engine = build_sector_engine()
@@ -76,6 +83,16 @@ class SectorRelativeStrengthMappingTests(unittest.TestCase):
         ctx = Context(market="KOSPI", upstream={"macro": macro_verdict})
         out = engine.run("semi", ctx, data=row)
         self.assertIn("macro regime", out.verdict.narrative)
+
+
+class SectorRiskProfileClassificationTests(unittest.TestCase):
+    """engine.sector.classification — 정적 위험선호 분류(데이터 무관)."""
+
+    def test_classify_known_defensive_code(self):
+        self.assertEqual(classify("Util"), "defensive")
+
+    def test_classify_unknown_code_defaults_neutral(self):
+        self.assertEqual(classify("unknown_code"), "neutral")
 
 
 class SectorPayloadMappingTests(unittest.TestCase):

@@ -43,7 +43,10 @@ class SectorRulebook:
                 direction="neutral", strength=0, conviction=None, lead_pattern=None,
                 narrative="섹터 상대강도 관측 불가 — 판단 보류.",
                 risks=["no_data"], invalidation=[], horizon="T1", verified=False,
-                extra={"observed_modules": [m.module_id for m in modules]},
+                extra={
+                    "observed_modules": [m.module_id for m in modules],
+                    "risk_profile": rs.inputs.get("risk_profile") if rs is not None else None,
+                },
             )
 
         if rs.state == "Leader" and rs.transition == "Weakening":
@@ -80,5 +83,6 @@ class SectorRulebook:
                 "rs_momentum": rs.inputs.get("rs_momentum"),
                 "quadrant": rs.inputs.get("quadrant"),
                 "approximation": rs.inputs.get("approximation"),
+                "risk_profile": rs.inputs.get("risk_profile"),
             },
         )
