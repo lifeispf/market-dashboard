@@ -147,9 +147,23 @@ export interface SectorTrail {
   trail: TrailPoint[] | null;
 }
 
+// Score-trend point (scores_daily / reconstructed F&G) — distinct from TrailPoint
+// (which is RRG-specific rsRatio/rsMomentum). Values are 0-100 scores.
+export interface ScorePoint {
+  date: string;
+  value: number;
+}
+
+// Phase B — snapshot-indicator score trends. `scores` keys are s01..s06 + composite
+// (mirrors backend/api/history.py SCORE_FIELDS); each value degrades independently
+// to [] when scores_daily has no/sparse rows for that field. `fearGreed` is
+// reconstructed server-side from stored price/vix/oas input series (not persisted
+// scores_daily), so it is populated and shows a real trend.
 export interface HistoryResponse {
   tier: "history";
   market: "KOSPI" | "NASDAQ";
   tf: string;
   sectors: SectorTrail[];
+  scores: Record<string, ScorePoint[]>;
+  fearGreed: ScorePoint[];
 }

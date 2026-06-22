@@ -6,9 +6,11 @@
 // §13-1 gauge next to REGIME per the task spec, without touching REGIME's own styling.
 import CeilingChart from "./CeilingChart";
 import FearGreedGauge from "./FearGreedGauge";
+import Sparkline from "./Sparkline";
 import { DirIcon } from "./icons";
 import { bandName, headroomColor, regimeLabel } from "../lib/helpers";
-import type { Bands, FearGreed, Regime, Reconciliation, Source } from "../api/types";
+import type { Timeframe } from "../api/client";
+import type { Bands, FearGreed, HistoryResponse, Regime, Reconciliation, Source } from "../api/types";
 
 interface LiquiditySectionProps {
   bands: Bands | null;
@@ -17,7 +19,18 @@ interface LiquiditySectionProps {
   fearGreed: FearGreed;
   reconciliation: Reconciliation;
   sources: Source[];
+  history: HistoryResponse | null;
+  tf: Timeframe;
 }
+
+// tf -> native-cadence-aware label wording for the composite score-trend sparkline.
+const TF_TREND_LABEL: Record<Timeframe, string> = {
+  "1D": "유동성 점수 추세 (일봉)",
+  "1W": "유동성 점수 추세 (주봉)",
+  "1M": "유동성 점수 추세 (월봉)",
+  "1Q": "유동성 점수 추세 (분기봉)",
+  "1Y": "유동성 점수 추세 (연봉)",
+};
 
 // Regime composite band cut points (BASE | BULL | HYPER) — mirrors regimeLabel() in helpers.ts.
 const REGIME_TICKS = [34, 67];
@@ -34,9 +47,17 @@ function BandTicks({ ticks }: { ticks: number[] }) {
   );
 }
 
-export default function LiquiditySection({ bands, level, regime, fearGreed, reconciliation, sources }: LiquiditySectionProps) {
+export default function LiquiditySection({ bands, level, regime, fearGreed, reconciliation, sources, history, tf }: LiquiditySectionProps) {
   const composite = regime.composite;
   const fillBucket = composite === null ? "locked" : composite >= 67 ? "tight" : composite >= 34 ? "neutral" : "open";
+
+  // Phase B — composite score-trend sparkline (B-class snapshot indicator: headline
+  // composite stays "current value", this is the *trend over the tf window* layered
+  // underneath). history.scores.composite is oldest->newest [{date,value}]; map to the
+  // plain number[] Sparkline expects. <2 points (sparse scores_daily accrual, or
+  // history fetch failed) -> "데이터 부족" fallback, never crash.
+  const compositeTrend = history?.scores?.composite ?? [];
+  const compositeTrendValues = compositeTrend.map((p) => p.value);
 
   return (
     <div className="ld-section">
@@ -66,6 +87,14 @@ export default function LiquiditySection({ bands, level, regime, fearGreed, reco
                 <div className={`fill f-${fillBucket}`} style={{ width: (composite ?? 0) + "%" }} />
                 <BandTicks ticks={REGIME_TICKS} />
               </div>
+              <div className="ld-score-trend">
+                <div className="ld-score-trend-lab">{TF_TREND_LABEL[tf]}</div>
+                {compositeTrendValues.length >= 2 ? (
+                  <Sparkline data={compositeTrendValues} showStats />
+                ) : (
+                  <div className="ld-score-trend-empty">데이터 부족(누적 중)</div>
+                )}
+              </div>
             </div>
             <div className="ld-reconcile">
               <span style={{ fontSize: 16 }}>{reconciliation.symbol}</span>
@@ -92,7 +121,7 @@ export default function LiquiditySection({ bands, level, regime, fearGreed, reco
             </div>
           </div>
         </div>
-        <FearGreedGauge fearGreed={fearGreed} />
+        <FearGreedGauge fearGreed={fearGreed} trend={history?.fearGreed ?? []} tf={tf} />
       </div>
       <div className="ld-src-preview">
         {sources.map((s) => (
@@ -112,28 +141,39 @@ export default function LiquiditySection({ bands, level, regime, fearGreed, reco
       <details className="ld-src-details">
         <summary>6개 원천 상세 펼치기</summary>
         <div className="ld-sources">
-          {sources.map((s) => (
-            <div className="ld-src" key={s.id}>
-              <div className="ld-src-top">
-                <span className="ld-src-id">{s.id}</span>
-                <span className="ld-src-name">{s.name}</span>
-                <span className="ld-src-scope">{s.scope}</span>
+          {sources.map((s) => {
+            // s.id is "S01".."S06" (uppercase); scores_daily columns are lowercase.
+            const scoreKey = s.id.toLowerCase();
+            const srcTrendValues = (history?.scores?.[scoreKey] ?? []).map((p) => p.value);
+            return (
+              <div className="ld-src" key={s.id}>
+                <div className="ld-src-top">
+                  <span className="ld-src-id">{s.id}</span>
+                  <span className="ld-src-name">{s.name}</span>
+                  {s.id === "S01" && <span className="ld-src-native">네이티브: 주간</span>}
+                  <span className="ld-src-scope">{s.scope}</span>
+                </div>
+                <div className="ld-src-state">{s.state}</div>
+                <div className="ld-src-gauge-row">
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-faint)" }}>헤드룸</span>
+                  <span className="gv">{s.headroom === null ? "N/A" : `${s.headroom}/100`}</span>
+                </div>
+                <div className="track" style={{ position: "relative" }}>
+                  <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
+                  <BandTicks ticks={HEADROOM_TICKS} />
+                </div>
+                <div className={`ld-dir c-${headroomColor(s.headroom)}`}>
+                  <DirIcon dir={s.dir} size={11} />
+                  {s.dirLabel}
+                </div>
+                {srcTrendValues.length >= 2 ? (
+                  <div className="ld-src-trend">
+                    <Sparkline data={srcTrendValues} />
+                  </div>
+                ) : null}
               </div>
-              <div className="ld-src-state">{s.state}</div>
-              <div className="ld-src-gauge-row">
-                <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-faint)" }}>헤드룸</span>
-                <span className="gv">{s.headroom === null ? "N/A" : `${s.headroom}/100`}</span>
-              </div>
-              <div className="track" style={{ position: "relative" }}>
-                <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
-                <BandTicks ticks={HEADROOM_TICKS} />
-              </div>
-              <div className={`ld-dir c-${headroomColor(s.headroom)}`}>
-                <DirIcon dir={s.dir} size={11} />
-                {s.dirLabel}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </details>
     </div>

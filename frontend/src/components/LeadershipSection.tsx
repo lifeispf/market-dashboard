@@ -15,14 +15,15 @@ import { useEffect, useState } from "react";
 import RRGChart from "./RRGChart";
 import { AlertTriangle } from "./icons";
 import { quadKr } from "../lib/helpers";
-import { fetchHistory, type Market, type Timeframe } from "../api/client";
-import type { Sector, SectorLeaders, TrailPoint } from "../api/types";
+import { type Market, type Timeframe } from "../api/client";
+import type { HistoryResponse, Sector, SectorLeaders, TrailPoint } from "../api/types";
 
 interface LeadershipSectionProps {
   sectors: Sector[];
   leaders: Record<string, SectorLeaders>;
   market: Market;
   tf: Timeframe;
+  history: HistoryResponse | null;
 }
 
 function treemapColor(ytd: number | null): string {
@@ -33,7 +34,7 @@ function treemapColor(ytd: number | null): string {
   return "rgba(208,107,74,.28)";
 }
 
-export default function LeadershipSection({ sectors, leaders, market, tf }: LeadershipSectionProps) {
+export default function LeadershipSection({ sectors, leaders, history }: LeadershipSectionProps) {
   const defaultCode = sectors.length
     ? sectors.reduce((a, b) => ((b.marketCap ?? 0) > (a.marketCap ?? 0) ? b : a)).code
     : null;
@@ -41,30 +42,24 @@ export default function LeadershipSection({ sectors, leaders, market, tf }: Lead
   // re-runs these initializers) on every market toggle — no effect-based reset needed.
   const [selSector, setSelSector] = useState<string | null>(defaultCode);
   const [selLeader, setSelLeader] = useState<string | null>(null);
-  const [trails, setTrails] = useState<Record<string, TrailPoint[]>>({});
 
-  // RRG trail overlay (Phase A) — fetch /api/history/{market}?tf= keyed on [market, tf]
-  // so the trail re-fetches on timeframe toggle. Failure degrades gracefully to no
-  // trails (RRGChart already handles missing/empty trails without crashing).
+  // RRG trail overlay (Phase A, unchanged behavior) — `history` is now fetched once in
+  // App.tsx (single /api/history fetch shared with LiquiditySection's Phase B score
+  // trends) and passed down as a prop instead of this component self-fetching. Derive
+  // the same {code: TrailPoint[]} map from it. Null/empty history degrades gracefully
+  // to no trails (RRGChart already handles missing/empty trails without crashing).
+  const [trails, setTrails] = useState<Record<string, TrailPoint[]>>({});
   useEffect(() => {
-    let cancelled = false;
-    fetchHistory(market, tf)
-      .then((res) => {
-        if (cancelled) return;
-        const next: Record<string, TrailPoint[]> = {};
-        for (const s of res.sectors) {
-          if (s.trail && s.trail.length) next[s.code] = s.trail;
-        }
-        setTrails(next);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setTrails({});
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [market, tf]);
+    if (!history) {
+      setTrails({});
+      return;
+    }
+    const next: Record<string, TrailPoint[]> = {};
+    for (const s of history.sectors) {
+      if (s.trail && s.trail.length) next[s.code] = s.trail;
+    }
+    setTrails(next);
+  }, [history]);
 
   if (!sectors.length || !selSector) {
     return (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchMarket, type Market, type Timeframe } from "./api/client";
-import type { MarketPayload } from "./api/types";
+import { fetchHistory, fetchMarket, type Market, type Timeframe } from "./api/client";
+import type { HistoryResponse, MarketPayload } from "./api/types";
 import "./design/styles.css";
 
 import GlobalMacroBar from "./components/GlobalMacroBar";
@@ -25,6 +25,7 @@ function App() {
   const [tf, setTf] = useState<Timeframe>("1D");
   const [data, setData] = useState<MarketPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +39,27 @@ function App() {
         if (cancelled) return;
         setData(null);
         setError(String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [market, tf]);
+
+  // Single source of truth for /api/history — previously LeadershipSection self-fetched
+  // this (Phase A); lifted here so LiquiditySection can also consume score/F&G trends
+  // (Phase B) without double-fetching the same endpoint. Failure degrades to null
+  // (both consumers are null-safe: LeadershipSection -> no trail overlay, LiquiditySection
+  // -> "데이터 부족" sparkline fallback).
+  useEffect(() => {
+    let cancelled = false;
+    fetchHistory(market, tf)
+      .then((res) => {
+        if (cancelled) return;
+        setHistory(res);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHistory(null);
       });
     return () => {
       cancelled = true;
@@ -87,8 +109,10 @@ function App() {
           fearGreed={payload.fearGreed}
           reconciliation={payload.reconciliation}
           sources={payload.sources}
+          history={history}
+          tf={tf}
         />
-        <LeadershipSection key={market} sectors={payload.sectors} leaders={payload.leaders} market={market} tf={tf} />
+        <LeadershipSection key={market} sectors={payload.sectors} leaders={payload.leaders} market={market} tf={tf} history={history} />
         <SectorView
           key={`sv-${market}`}
           market={market}

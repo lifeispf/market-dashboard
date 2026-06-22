@@ -99,6 +99,15 @@
 .ld-reconcile .t b{color:var(--text);font-weight:500}
 .ld-avail{font-family:var(--mono);font-size:10px;color:var(--text-faint);margin-top:2px}
 
+/* Phase B — snapshot indicator score-trend sparklines (composite/F&G/per-source).
+   B-class indicators ("스냅샷") keep their headline value; this is the trend strip
+   layered underneath showing how that score moved over the selected tf window. */
+.ld-score-trend{margin-top:12px}
+.ld-score-trend-lab{font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:.08em;margin-bottom:4px}
+.ld-score-trend-empty{font-size:11px;color:var(--text-faint);padding:8px 0}
+.ld-src-trend{margin-top:8px}
+.ld-src-native{font-family:var(--mono);font-size:9px;color:var(--brass-soft);border:1px solid var(--line-soft);border-radius:3px;padding:1px 5px;letter-spacing:.04em;white-space:nowrap}
+
 /* Fear & Greed gauge — separate "심리" palette, never brass */
 .fg-open{background:linear-gradient(90deg,#3a5e8f,var(--fg-fear))}
 .fg-neutral{background:linear-gradient(90deg,#5d5490,var(--fg-neutral))}
@@ -133,6 +142,11 @@
 
 /* distinct-from-CNN clarifying note */
 .ld-fg-note{margin-top:10px;font-size:10.5px;line-height:1.5;color:var(--text-faint)}
+
+/* Phase B — F&G score-trend sparkline (tf-window trend under the bipolar gauge) */
+.ld-fg-trend{margin-top:10px}
+.ld-fg-trend-lab{font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:.08em;margin-bottom:4px}
+.ld-fg-trend-empty{font-size:11px;color:var(--text-faint);padding:8px 0}
 
 /* band threshold tick marks — overlay on .track to show regime/headroom cut points */
 .ld-track-ticks{position:absolute;inset:0;pointer-events:none}

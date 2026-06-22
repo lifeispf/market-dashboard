@@ -9,17 +9,30 @@
 // signals (reversal risk), so a single fill-to-100 bar is semantically wrong. Replaced
 // with a 5-zone diverging track (cut points 25/45/56/75, matching server LABEL_BANDS)
 // and a needle marking the current score position.
+import Sparkline from "./Sparkline";
 import { fearGreedColor, fearGreedInterpretation } from "../lib/helpers";
-import type { FearGreed } from "../api/types";
+import type { Timeframe } from "../api/client";
+import type { FearGreed, ScorePoint } from "../api/types";
 
 interface FearGreedGaugeProps {
   fearGreed: FearGreed;
+  trend?: ScorePoint[];
+  tf?: Timeframe;
 }
 
 // 5-zone diverging track cut points — mirrors server LABEL_BANDS (<25/<45/<56/<75/else).
 const FG_ZONE_CUTS = [25, 45, 56, 75];
 
-export default function FearGreedGauge({ fearGreed }: FearGreedGaugeProps) {
+// tf -> native-cadence-aware label for the F&G score-trend sparkline.
+const TF_TREND_LABEL: Record<Timeframe, string> = {
+  "1D": "심리 추세 (일봉)",
+  "1W": "심리 추세 (주봉)",
+  "1M": "심리 추세 (월봉)",
+  "1Q": "심리 추세 (분기봉)",
+  "1Y": "심리 추세 (연봉)",
+};
+
+export default function FearGreedGauge({ fearGreed, trend = [], tf = "1D" }: FearGreedGaugeProps) {
   const { score, label, nAvailable, nTotal, factors } = fearGreed;
   const hasScore = score !== null && score !== undefined && !Number.isNaN(score);
   const pct = hasScore ? Math.max(0, Math.min(100, score as number)) : null;
@@ -57,6 +70,15 @@ export default function FearGreedGauge({ fearGreed }: FearGreedGaugeProps) {
           </div>
 
           <div className="ld-fg-interp">{interp.text}</div>
+
+          <div className="ld-fg-trend">
+            <div className="ld-fg-trend-lab">{TF_TREND_LABEL[tf]}</div>
+            {trend.length >= 2 ? (
+              <Sparkline data={trend.map((p) => p.value)} showStats />
+            ) : (
+              <div className="ld-fg-trend-empty">데이터 부족</div>
+            )}
+          </div>
         </div>
 
         <details className="ld-fg-factors-details">
