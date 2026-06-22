@@ -119,63 +119,50 @@ export default function LiquiditySection({ bands, level, regime, fearGreed, reco
                 )}
               </div>
             </div>
+
+            <details className="ld-regime-factors-details">
+              <summary>구성 팩터 펼치기</summary>
+              {sources.length > 0 ? (
+                <div className="ld-regime-factors">
+                  {sources.map((s) => {
+                    // s.id is "S01".."S06" (uppercase); scores_daily columns are lowercase.
+                    const scoreKey = s.id.toLowerCase();
+                    const srcTrendValues = (history?.scores?.[scoreKey] ?? []).map((p) => p.value);
+                    return (
+                      <div className="ld-regime-factor" key={s.id}>
+                        <div className="ld-regime-factor-row">
+                          <span className="fid">{s.id}</span>
+                          <span className="fn">
+                            {s.name}
+                            {s.id === "S01" && <span className="ld-src-native">네이티브: 주간</span>}
+                          </span>
+                          <div className="track" style={{ position: "relative" }}>
+                            <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
+                            <BandTicks ticks={HEADROOM_TICKS} />
+                          </div>
+                          <span className="fv">{s.headroom === null ? "N/A" : Math.round(s.headroom)}</span>
+                          <span className={`ld-regime-factor-dir c-${headroomColor(s.headroom)}`}>
+                            <DirIcon dir={s.dir} size={10} />
+                            {s.dirLabel}
+                          </span>
+                        </div>
+                        {srcTrendValues.length >= 2 ? (
+                          <div className="ld-src-trend">
+                            <Sparkline data={srcTrendValues} />
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="ld-fg-factors-empty">원천 데이터 없음</div>
+              )}
+            </details>
           </div>
         </div>
         <FearGreedGauge fearGreed={fearGreed} trend={history?.fearGreed ?? []} tf={tf} />
       </div>
-      <div className="ld-src-preview">
-        {sources.map((s) => (
-          <div className="ld-src-mini" key={s.id}>
-            <span className="ld-src-mini-id">{s.id}</span>
-            <div className="track ld-src-mini-track">
-              <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
-              <BandTicks ticks={HEADROOM_TICKS} />
-            </div>
-            <span className="ld-src-mini-score">{s.score === null ? "N/A" : Math.round(s.score)}</span>
-            <span className={`ld-src-mini-dir c-${headroomColor(s.headroom)}`}>
-              <DirIcon dir={s.dir} size={10} />
-            </span>
-          </div>
-        ))}
-      </div>
-      <details className="ld-src-details">
-        <summary>6개 원천 상세 펼치기</summary>
-        <div className="ld-sources">
-          {sources.map((s) => {
-            // s.id is "S01".."S06" (uppercase); scores_daily columns are lowercase.
-            const scoreKey = s.id.toLowerCase();
-            const srcTrendValues = (history?.scores?.[scoreKey] ?? []).map((p) => p.value);
-            return (
-              <div className="ld-src" key={s.id}>
-                <div className="ld-src-top">
-                  <span className="ld-src-id">{s.id}</span>
-                  <span className="ld-src-name">{s.name}</span>
-                  {s.id === "S01" && <span className="ld-src-native">네이티브: 주간</span>}
-                  <span className="ld-src-scope">{s.scope}</span>
-                </div>
-                <div className="ld-src-state">{s.state}</div>
-                <div className="ld-src-gauge-row">
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-faint)" }}>헤드룸</span>
-                  <span className="gv">{s.headroom === null ? "N/A" : `${s.headroom}/100`}</span>
-                </div>
-                <div className="track" style={{ position: "relative" }}>
-                  <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
-                  <BandTicks ticks={HEADROOM_TICKS} />
-                </div>
-                <div className={`ld-dir c-${headroomColor(s.headroom)}`}>
-                  <DirIcon dir={s.dir} size={11} />
-                  {s.dirLabel}
-                </div>
-                {srcTrendValues.length >= 2 ? (
-                  <div className="ld-src-trend">
-                    <Sparkline data={srcTrendValues} />
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </details>
     </div>
   );
 }

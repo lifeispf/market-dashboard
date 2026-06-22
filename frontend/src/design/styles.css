@@ -152,32 +152,21 @@
 .ld-track-ticks{position:absolute;inset:0;pointer-events:none}
 .ld-track-tick{position:absolute;top:-1px;bottom:-1px;width:1px;background:rgba(233,231,221,.45)}
 
-/* compact source preview (6 mini-rows under the Regime gauge) */
-.ld-src-preview{display:flex;flex-direction:column;gap:6px;margin-top:14px}
-.ld-src-mini{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-soft);border-radius:5px;padding:6px 10px}
-.ld-src-mini-id{font-family:var(--mono);font-size:10px;color:var(--brass);min-width:34px}
-.ld-src-mini-track{flex:1;position:relative}
-.ld-src-mini-score{font-family:var(--mono);font-size:11.5px;font-weight:600;min-width:28px;text-align:right}
-.ld-src-mini-dir{display:inline-flex;align-items:center}
-
-/* collapsible full source detail cards */
-.ld-src-details{margin-top:10px}
-.ld-src-details>summary{cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--brass);letter-spacing:.04em;padding:6px 2px;list-style:none}
-.ld-src-details>summary::-webkit-details-marker{display:none}
-.ld-src-details>summary::before{content:"▸ ";color:var(--text-faint)}
-.ld-src-details[open]>summary::before{content:"▾ "}
-
-/* source panels */
-.ld-sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
-.ld-src{background:var(--panel);border:1px solid var(--line-soft);border-radius:6px;padding:16px 18px}
-.ld-src-top{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap}
-.ld-src-id{font-family:var(--mono);font-size:10px;color:var(--brass);border:1px solid var(--line);border-radius:3px;padding:2px 6px}
-.ld-src-name{font-family:var(--disp);font-size:14.5px;font-weight:500}
-.ld-src-scope{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;color:var(--text-faint);margin-left:auto}
-.ld-src-state{font-size:12.5px;color:var(--text-dim);line-height:1.6;margin-bottom:10px}
-.ld-src-gauge-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
-.ld-src-gauge-row .gv{font-family:var(--mono);font-size:12px;font-weight:600}
-.ld-dir{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;margin-top:6px}
+/* Regime card — "구성 팩터 펼치기" collapsible (6 liquidity sources), mirrors
+   .ld-fg-factors-details/.ld-fg-factor structure in the Fear&Greed card so the two
+   gauge cards read as visually parallel. */
+.ld-regime-factors-details{margin-top:12px}
+.ld-regime-factors-details>summary{cursor:pointer;font-family:var(--mono);font-size:10.5px;color:var(--brass);letter-spacing:.04em;padding:4px 2px;list-style:none}
+.ld-regime-factors-details>summary::-webkit-details-marker{display:none}
+.ld-regime-factors-details>summary::before{content:"▸ ";color:var(--text-faint)}
+.ld-regime-factors-details[open]>summary::before{content:"▾ "}
+.ld-regime-factors{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.ld-regime-factor-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim)}
+.ld-regime-factor-row .fid{font-family:var(--mono);font-size:10px;color:var(--brass);border:1px solid var(--line);border-radius:3px;padding:1px 5px;min-width:30px;text-align:center}
+.ld-regime-factor-row .fn{font-family:var(--mono);min-width:64px;color:var(--text-faint);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ld-regime-factor-row .track{flex:1;position:relative}
+.ld-regime-factor-row .fv{font-family:var(--mono);min-width:28px;text-align:right;color:var(--text-faint)}
+.ld-regime-factor-dir{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;min-width:48px}
 .c-open{color:var(--open)} .c-neutral{color:var(--neutral)} .c-tight{color:var(--tight)} .c-locked{color:var(--locked)}
 
 /* treemap */
