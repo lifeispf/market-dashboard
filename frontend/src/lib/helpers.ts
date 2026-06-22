@@ -124,3 +124,16 @@ export function transitionKr(t: Transition | null): string {
   if (!t) return "추세 불명";
   return TRANSITION_KR[t];
 }
+
+// position_size_hint (stock Verdict.extra, §39) -> KR label + color bucket.
+const SIZE_HINT: Record<string, { label: string; color: string }> = {
+  full: { label: "풀", color: "open" },
+  half: { label: "½", color: "neutral" },
+  quarter: { label: "¼", color: "neutral" },
+  avoid: { label: "회피", color: "tight" },
+};
+
+export function sizeHint(hint: unknown): { label: string; color: string } | null {
+  if (typeof hint !== "string") return null;
+  return SIZE_HINT[hint] ?? null;
+}

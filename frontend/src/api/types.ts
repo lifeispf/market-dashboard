@@ -124,3 +124,9 @@ export interface SectorsResponse {
   market: "KOSPI" | "NASDAQ";
   sectors: EngineOutput[];
 }
+
+export interface StocksResponse {
+  tier: "stock";
+  market: "KOSPI" | "NASDAQ";
+  stocks: EngineOutput[];
+}

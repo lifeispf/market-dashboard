@@ -1,4 +1,4 @@
-import type { MarketPayload, SectorsResponse } from "./types";
+import type { MarketPayload, SectorsResponse, StocksResponse } from "./types";
 
 export type Market = "KOSPI" | "NASDAQ";
 
@@ -13,6 +13,13 @@ export async function fetchMarket(market: Market): Promise<MarketPayload> {
 export async function fetchSectors(market: Market): Promise<SectorsResponse> {
   const res = await fetch(`/api/sectors/${market}`);
   if (!res.ok) throw new Error(`API ${res.status} for sectors ${market}`);
+  return res.json();
+}
+
+// Stock tier (Engine Core envelope) — GET /api/stocks/{market}.
+export async function fetchStocks(market: Market): Promise<StocksResponse> {
+  const res = await fetch(`/api/stocks/${market}`);
+  if (!res.ok) throw new Error(`API ${res.status} for stocks ${market}`);
   return res.json();
 }
 

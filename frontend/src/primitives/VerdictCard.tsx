@@ -4,7 +4,7 @@
 // narrative/risks. The `verified` flag (§9.1) is load-bearing: until walk-forward
 // backtesting lands, conviction is an unverified heuristic and is labeled as such.
 import type { EngineOutput } from "../api/types";
-import { directionColor, DIRECTION_KR, DIRECTION_ARROW } from "../lib/helpers";
+import { directionColor, DIRECTION_KR, DIRECTION_ARROW, sizeHint } from "../lib/helpers";
 import ModuleCard from "./ModuleCard";
 
 interface VerdictCardProps {
@@ -17,6 +17,7 @@ export default function VerdictCard({ output, title }: VerdictCardProps) {
   const color = directionColor(v.direction);
   // strength 0..4 → 4 pips.
   const pips = [0, 1, 2, 3].map((i) => i < v.strength);
+  const size = sizeHint(v.extra?.position_size_hint); // present on stock tier (§39)
 
   return (
     <div className="vc-card">
@@ -37,6 +38,7 @@ export default function VerdictCard({ output, title }: VerdictCardProps) {
             <i key={i} className={`vc-pip ${on ? `vc-pip-${color}` : ""}`} />
           ))}
         </span>
+        {size && <span className={`vc-size vc-${size.color}`}>사이즈 {size.label}</span>}
         {output.mode === "degraded" && <span className="vc-degraded-tag">데이터 일부 결손</span>}
       </div>
 
