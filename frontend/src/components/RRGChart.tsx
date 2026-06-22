@@ -3,21 +3,27 @@
 // 100 (e.g. 99.5, 101.7), not on 1.0 / 0 like the prototype's mock rsR/rsM. The center
 // crosshair and axis domain below are rebuilt around 100/100 instead of 1.0/0.
 // quadrant is pre-computed server-side (payload.sectors[].quadrant) — not recomputed here.
+//
+// Phase C: generalized from `sectors: Sector[]` to `points: RRGPoint[]` so this same
+// component can plot either sectors (vs index) or stocks-within-a-sector (vs sector,
+// Sector-RS). `Sector` structurally satisfies `RRGPoint`, so the existing sector caller
+// is unaffected. `selectedKey`/`onSelect` are now optional — a read-only RRG (e.g. the
+// stock-within-sector view) can omit selection entirely.
 import { QUAD_COLOR } from "../lib/helpers";
-import type { Sector, TrailPoint } from "../api/types";
+import type { RRGPoint, TrailPoint } from "../api/types";
 
 interface RRGChartProps {
-  sectors: Sector[];
-  selectedKey: string | null;
-  onSelect: (code: string) => void;
-  // Optional sector-code -> trail (oldest..newest rsRatio/rsMomentum points), used to
-  // draw a faint "where this dot has been" path for the selected sector. Additive —
+  points: RRGPoint[];
+  selectedKey?: string | null;
+  onSelect?: (code: string) => void;
+  // Optional code -> trail (oldest..newest rsRatio/rsMomentum points), used to
+  // draw a faint "where this dot has been" path for the selected point. Additive —
   // absent/empty trail just means no polyline is drawn (no crash).
   trails?: Record<string, TrailPoint[]>;
 }
 
-export default function RRGChart({ sectors, selectedKey, onSelect, trails }: RRGChartProps) {
-  const plottable = sectors.filter((s) => s.rsRatio !== null && s.rsMomentum !== null);
+export default function RRGChart({ points, selectedKey = null, onSelect, trails }: RRGChartProps) {
+  const plottable = points.filter((s) => s.rsRatio !== null && s.rsMomentum !== null);
 
   if (plottable.length === 0) {
     return (
@@ -78,9 +84,9 @@ export default function RRGChart({ sectors, selectedKey, onSelect, trails }: RRG
           return (
             <button
               key={s.code}
-              className={`rrg-dot dot-${color} ${selectedKey === s.code ? "sel" : ""}`}
+              className={`rrg-dot dot-${color} ${selectedKey === s.code ? "sel" : ""} ${onSelect ? "" : "static"}`}
               style={{ left: leftPct(s.rsRatio as number) + "%", top: topPct(s.rsMomentum as number) + "%" }}
-              onClick={() => onSelect(s.code)}
+              onClick={onSelect ? () => onSelect(s.code) : undefined}
               title={s.name}
             >
               <span className="rrg-dot-label">{s.name}</span>

@@ -45,6 +45,18 @@ export interface Sector {
   rsRatio: number | null; rsMomentum: number | null; quadrant: Quadrant | null;
 }
 
+// Minimal RRG-plottable point — generalizes RRGChart's input beyond Sector so it can
+// also plot stocks (Phase C: sector-internal stock RRG using Sector-RS coordinates).
+// `Sector` already structurally satisfies this (code/name/rsRatio/rsMomentum/quadrant),
+// so existing sector RRG usage is unaffected.
+export interface RRGPoint {
+  code: string;
+  name: string;
+  rsRatio: number | null;
+  rsMomentum: number | null;
+  quadrant: Quadrant | null;
+}
+
 export interface Leader {
   ticker: string; name: string; role: string; price: number | null; ytd: number | null;
   thesis: string; stats: [string, string][]; risk: string; asOf: string;

@@ -15,8 +15,20 @@ import { useEffect, useState } from "react";
 import RRGChart from "./RRGChart";
 import { AlertTriangle } from "./icons";
 import { quadKr } from "../lib/helpers";
-import { type Market, type Timeframe } from "../api/client";
-import type { HistoryResponse, Sector, SectorLeaders, TrailPoint } from "../api/types";
+import { fetchStocks, type Market, type Timeframe } from "../api/client";
+import type { EngineOutput, HistoryResponse, RRGPoint, Sector, SectorLeaders, TrailPoint } from "../api/types";
+
+// Ticker -> display name, joined from the curated `leaders` block (same pattern as
+// StockView.buildNameByTicker — duplicated here rather than imported since StockView
+// does not export it and we must not modify StockView.tsx).
+function buildNameByTicker(leaders: Record<string, SectorLeaders>): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const code of Object.keys(leaders)) {
+    const grp = leaders[code];
+    for (const l of [...grp.key, ...(grp.star || [])]) map[l.ticker] = l.name;
+  }
+  return map;
+}
 
 interface LeadershipSectionProps {
   sectors: Sector[];
@@ -34,7 +46,7 @@ function treemapColor(ytd: number | null): string {
   return "rgba(208,107,74,.28)";
 }
 
-export default function LeadershipSection({ sectors, leaders, history }: LeadershipSectionProps) {
+export default function LeadershipSection({ sectors, leaders, market, tf, history }: LeadershipSectionProps) {
   const defaultCode = sectors.length
     ? sectors.reduce((a, b) => ((b.marketCap ?? 0) > (a.marketCap ?? 0) ? b : a)).code
     : null;
@@ -61,6 +73,30 @@ export default function LeadershipSection({ sectors, leaders, history }: Leaders
     setTrails(next);
   }, [history]);
 
+  // Phase C: independent stock fetch for the sector-internal RRG ("who is strong/weak
+  // WITHIN this sector", using sector_rs_ratio/momentum/quadrant added to verdict.extra).
+  // StockView.tsx already fetches /api/stocks for its own card; this is a deliberate,
+  // low-risk redundant GET rather than refactoring StockView to share state.
+  const [stocks, setStocks] = useState<EngineOutput[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setStocks(null);
+    fetchStocks(market, tf)
+      .then((res) => {
+        if (cancelled) return;
+        setStocks(res.stocks);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStocks([]); // null-safe degrade — empty list renders the "데이터 부족" placeholder
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [market, tf]);
+
+  const nameByTicker = buildNameByTicker(leaders);
+
   if (!sectors.length || !selSector) {
     return (
       <div className="ld-section">
@@ -82,6 +118,21 @@ export default function LeadershipSection({ sectors, leaders, history }: Leaders
       ]
     : [];
   const selLeaderObj = allLeaders.find((l) => l.ticker === selLeader) || null;
+
+  // Phase C: stocks belonging to the selected sector (matched via verdict.extra.sector_code,
+  // which the backend now stamps on every stock output), mapped to RRGPoint using their
+  // Sector-RS coordinates (sector_rs_ratio/momentum/quadrant — RS vs the sector itself, not
+  // the index). Null-safe: stocks missing extra or with null sector_rs are excluded below.
+  const sectorStockPoints: RRGPoint[] = (stocks ?? [])
+    .filter((o) => o.verdict.extra?.sector_code === sel.code)
+    .map((o) => ({
+      code: o.entity_id,
+      name: nameByTicker[o.entity_id] ?? o.entity_id,
+      rsRatio: (o.verdict.extra?.sector_rs_ratio as number | null | undefined) ?? null,
+      rsMomentum: (o.verdict.extra?.sector_rs_momentum as number | null | undefined) ?? null,
+      quadrant: (o.verdict.extra?.sector_quadrant as RRGPoint["quadrant"] | null | undefined) ?? null,
+    }));
+  const plottableStockPoints = sectorStockPoints.filter((p) => p.rsRatio !== null && p.rsMomentum !== null);
 
   return (
     <div className="ld-section">
@@ -115,7 +166,7 @@ export default function LeadershipSection({ sectors, leaders, history }: Leaders
         <div className="ld-card">
           <div className="ld-card-title">순환매 (RRG) — 상대강도 × 모멘텀</div>
           <RRGChart
-            sectors={sectors}
+            points={sectors}
             selectedKey={selSector}
             trails={trails}
             onSelect={(k) => {
@@ -195,6 +246,40 @@ export default function LeadershipSection({ sectors, leaders, history }: Leaders
             <div className="ld-simple">이 섹터는 큐레이션된 주도주 데이터가 없습니다 (leaders 미생략).</div>
           )}
         </div>
+      </div>
+
+      <div className="ld-card" style={{ marginTop: 18 }}>
+        <div className="ld-card-title">{sel.name} 내 종목 RRG (vs 섹터)</div>
+        <div className="ld-hint">
+          이 섹터 안에서 종목들의 상대강도 위치 — Sector-RS(섹터 자체 대비, 지수 대비가 아님) 기준. 같은 사분면 구조(LEADING/WEAKENING/IMPROVING/LAGGING)를 공유합니다.
+        </div>
+        {stocks === null ? (
+          <div className="ld-simple">종목 데이터 불러오는 중…</div>
+        ) : plottableStockPoints.length === 0 ? (
+          <div className="ld-empty">데이터 부족 / 종목 RS 미가용</div>
+        ) : (
+          <>
+            <RRGChart points={plottableStockPoints} />
+            <div className="ld-rrg-legend">
+              <span>
+                <i style={{ background: "var(--open)" }} />
+                leading · 섹터 내 주도
+              </span>
+              <span>
+                <i style={{ background: "var(--tight)" }} />
+                weakening · 차익 임박
+              </span>
+              <span>
+                <i style={{ background: "var(--neutral)" }} />
+                improving · 순환매 진입
+              </span>
+              <span>
+                <i style={{ background: "var(--locked)" }} />
+                lagging · 소외
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
