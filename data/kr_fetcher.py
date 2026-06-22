@@ -4,6 +4,8 @@ import pandas as pd
 import yfinance as yf
 from pykrx import stock
 
+from data import krx_openapi
+
 KOSPI_INDEX_TICKER = "1001"
 KOSPI_YF_TICKER = "^KS11"
 
@@ -31,7 +33,11 @@ def _fetch_from_yfinance():
 
 
 def fetch_kospi_level():
-    """Returns (value, as_of_date, source, error). value is None only if both sources fail."""
+    """Returns (value, as_of_date, source, error). value is None only if all sources fail.
+    Source priority: KRX OpenAPI (AUTH_KEY) -> pykrx -> Yahoo Finance."""
+    oa = krx_openapi.fetch_kospi_level()  # None if no key / unavailable
+    if oa is not None:
+        return oa[0], oa[1], "KRX OpenAPI", None
     try:
         value, as_of = _fetch_from_pykrx()
         return value, as_of, "KRX", None
@@ -76,7 +82,12 @@ def fetch_foreign_institutional_netbuy(lookback_days=20):
 
 
 def fetch_breadth(target_date=None):
-    """Single-day KOSPI advancers/decliners. Returns (advancers, decliners, as_of, error)."""
+    """Single-day KOSPI advancers/decliners. Returns (advancers, decliners, as_of, error).
+    Source priority: KRX OpenAPI -> pykrx."""
+    if target_date is None:
+        oa = krx_openapi.fetch_breadth()  # None if no key / unavailable
+        if oa is not None:
+            return oa[0], oa[1], oa[2], None
     try:
         d = target_date or date.today()
         df = stock.get_market_ohlcv_by_ticker(d.strftime("%Y%m%d"), market="KOSPI", alternative=True)
@@ -108,7 +119,11 @@ def fetch_kospi_fundamental():
 
 
 def fetch_kospi_total_market_cap():
-    """Sums per-ticker market cap across all KOSPI tickers for today. Returns (value_krw, as_of_date, error)."""
+    """Sums per-ticker market cap across all KOSPI tickers for today. Returns (value_krw, as_of_date, error).
+    Source priority: KRX OpenAPI -> pykrx."""
+    oa = krx_openapi.fetch_total_market_cap()  # None if no key / unavailable
+    if oa is not None:
+        return oa[0], oa[1], None
     try:
         d = date.today()
         df = stock.get_market_cap_by_ticker(d.strftime("%Y%m%d"), market="KOSPI", alternative=True)
