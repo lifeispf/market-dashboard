@@ -9,6 +9,7 @@ import CrossNarrativeBadge from "./components/CrossNarrativeBadge";
 import FlowSection from "./components/FlowSection";
 import LiquiditySection from "./components/LiquiditySection";
 import LeadershipSection from "./components/LeadershipSection";
+import SectorView from "./components/SectorView";
 import WatchlistTable from "./components/WatchlistTable";
 import FreshnessBar from "./components/FreshnessBar";
 import Footer from "./components/Footer";
@@ -82,6 +83,11 @@ function App() {
           sources={payload.sources}
         />
         <LeadershipSection key={market} sectors={payload.sectors} leaders={payload.leaders} />
+        <SectorView
+          key={`sv-${market}`}
+          market={market}
+          nameByCode={Object.fromEntries(payload.sectors.map((s) => [s.code, s.name]))}
+        />
         <WatchlistTable watchlist={payload.watchlist} />
         <FreshnessBar freshness={payload.freshness} />
         <Footer mode={payload._mode} source={payload.source} />

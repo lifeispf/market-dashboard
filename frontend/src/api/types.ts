@@ -73,3 +73,54 @@ export interface MarketPayload {
   freshness: FreshnessItem[];
   _mode: "mock" | "live";
 }
+
+// ---------------------------------------------------------------------------
+// Engine Core envelope (NOT frozen) — mirror of engine/core/contracts.py.
+// Shared shape across all tiers (macro/sector/stock/strategy). Served by the
+// new tier endpoints (/api/sectors, later /api/stocks, /api/briefing). This is
+// the §8.2 unified envelope the shared primitives (<VerdictCard>/<ModuleCard>)
+// render regardless of tier. Distinct from the frozen MarketPayload above.
+// ---------------------------------------------------------------------------
+export type Direction = "strong_up" | "up" | "neutral" | "down" | "strong_down";
+export type Transition = "improving" | "stable" | "weakening" | "breaking";
+export type Horizon = "T0" | "T1" | "T2" | "T3";
+export type EngineMode = "live" | "mock" | "degraded";
+
+export interface ModuleOutput {
+  module_id: string;
+  state: string | null;
+  transition: Transition | null;
+  strength: number | null;
+  confidence: number | null;
+  narrative: string;
+  inputs: Record<string, unknown>;
+}
+
+export interface Verdict {
+  direction: Direction;
+  strength: number; // 0..4
+  conviction: number | null;
+  lead_pattern: string | null;
+  narrative: string;
+  risks: string[];
+  invalidation: string[];
+  horizon: Horizon;
+  verified: boolean;
+  extra: Record<string, unknown>;
+}
+
+export interface EngineOutput {
+  tier: string;
+  entity_id: string;
+  verdict: Verdict;
+  modules: ModuleOutput[];
+  context: Record<string, unknown>;
+  freshness: unknown[];
+  mode: EngineMode;
+}
+
+export interface SectorsResponse {
+  tier: "sector";
+  market: "KOSPI" | "NASDAQ";
+  sectors: EngineOutput[];
+}

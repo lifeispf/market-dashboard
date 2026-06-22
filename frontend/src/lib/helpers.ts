@@ -4,7 +4,7 @@
 //  - rsRatio/rsMomentum from the live contract are centered on 100 (not 1.0 / 0 like the prototype's mock rsR/rsM),
 //    so quadrant comes pre-computed from the server (payload.sectors[].quadrant) and is NOT recomputed client-side.
 
-import type { Bands, Quadrant } from "../api/types";
+import type { Bands, Direction, Quadrant, Transition } from "../api/types";
 
 export const fmt = (n: number | null | undefined): string => {
   if (n === null || n === undefined || Number.isNaN(n)) return "N/A";
@@ -86,4 +86,41 @@ export function fearGreedColor(score: number | null): string {
   if (score >= 55) return "tight"; // greed end -> fg-tight (magenta)
   if (score <= 45) return "open"; // fear end -> fg-open (blue)
   return "neutral";
+}
+
+// ---- Engine Core envelope display helpers (tier-agnostic) ----
+
+// Verdict.direction -> brass-system color bucket (open=green/up, neutral=gold, tight=red/down).
+export function directionColor(d: Direction): string {
+  if (d === "strong_up" || d === "up") return "open";
+  if (d === "strong_down" || d === "down") return "tight";
+  return "neutral";
+}
+
+export const DIRECTION_KR: Record<Direction, string> = {
+  strong_up: "강한 상승",
+  up: "상승",
+  neutral: "중립",
+  down: "하락",
+  strong_down: "강한 하락",
+};
+
+export const DIRECTION_ARROW: Record<Direction, string> = {
+  strong_up: "▲▲",
+  up: "▲",
+  neutral: "—",
+  down: "▼",
+  strong_down: "▼▼",
+};
+
+export const TRANSITION_KR: Record<Transition, string> = {
+  improving: "개선",
+  stable: "안정",
+  weakening: "둔화",
+  breaking: "붕괴",
+};
+
+export function transitionKr(t: Transition | null): string {
+  if (!t) return "추세 불명";
+  return TRANSITION_KR[t];
 }
