@@ -84,8 +84,14 @@ class Engine:
         절차(00_architecture.md §4.2):
             1. available_for(ctx.market)가 True인 모듈만 compute() 호출.
             2. rulebook.interpret(outs, ctx)로 Verdict 산출.
-            3. mode 결정: outs 중 state 또는 confidence가 None인 모듈이
-               하나라도 있으면 "degraded", 아니면 "live"를 기본으로 한다.
+            3. mode 결정: outs 중 state가 None인 모듈이 하나라도 있으면
+               "degraded", 아니면 "live"를 기본으로 한다. confidence는 이
+               판정에 쓰지 않는다 — confidence는 비검증 휴리스틱(§9.1)이라
+               애초에 None일 수 있는 필드다(예: macro 모듈은 축별
+               confidence 개념이 없어 항상 None을 반환한다). confidence가
+               None이라는 이유로 degraded 처리하면 관측(state) 자체는
+               멀쩠한데도 매번 잘못 degrade로 오판된다. degraded는 오직
+               "관측이 실패해 state를 못 채운" 경우만을 가리킨다.
                (TODO: data 인자가 "mock" 데이터 소스임을 나타내는 경우
                mode="mock"으로 분기하는 규칙은 §11 마이그레이션 2단계
                이후 data 평면 계약이 확정되면 추가한다. 지금은 mock 판별
@@ -110,7 +116,7 @@ class Engine:
 
         verdict = self.rulebook.interpret(outs, ctx)
 
-        degraded = any(o.state is None or o.confidence is None for o in outs)
+        degraded = any(o.state is None for o in outs)
         mode: str = "degraded" if degraded else "live"
 
         return EngineOutput(

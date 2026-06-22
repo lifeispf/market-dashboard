@@ -39,6 +39,34 @@ class HealthyModule:
         )
 
 
+class StateOnlyNoConfidenceModule:
+    """state는 유효하지만 confidence는 항상 None인 더미 Module.
+
+    macro 모듈(축별 confidence 개념이 없는 §9.1 비검증 휴리스틱 영역)을
+    모의한다 — confidence=None이 degraded 오판으로 이어지지 않아야 함을
+    검증하기 위한 픽스처."""
+
+    id = "dummy.state_only_no_confidence"
+    tier = "dummy"
+
+    def available_for(self, market: str) -> bool:
+        return True
+
+    def required_series(self, entity_id, ctx):
+        return []
+
+    def compute(self, entity_id, ctx, data) -> ModuleOutput:
+        return ModuleOutput(
+            module_id=self.id,
+            state="bull",
+            transition="improving",
+            strength=0.8,
+            confidence=None,
+            narrative="state observed but confidence is an unverified heuristic, left None",
+            inputs={"raw_score": 80},
+        )
+
+
 class DegradedModule:
     """state=None을 산출해 degrade를 모의하는 더미 Module."""
 
@@ -185,6 +213,23 @@ class EngineRunTests(unittest.TestCase):
         engine = Engine(
             tier="dummy",
             modules=[HealthyModule()],
+            rulebook=FirstDirectionRulebook(),
+        )
+        ctx = Context.root(market="KOSPI")
+
+        result = engine.run("ENTITY_X", ctx, data=None)
+
+        self.assertEqual(result.mode, "live")
+
+    def test_state_present_but_confidence_none_yields_live_mode(self) -> None:
+        """state는 유효하지만 confidence=None인 모듈만 있으면 mode=="live"여야
+        한다 — confidence는 비검증 휴리스틱(§9.1)이라 정상적으로 None일 수
+        있고(예: macro 모듈은 축별 confidence 개념이 없음), state=None이
+        아닌 한 이것만으로 degraded 오판을 일으키면 안 된다(0단계 키스톤 보정
+        회귀 테스트)."""
+        engine = Engine(
+            tier="dummy",
+            modules=[StateOnlyNoConfidenceModule()],
             rulebook=FirstDirectionRulebook(),
         )
         ctx = Context.root(market="KOSPI")
