@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Streamlit Dashboard",
+      "name": "Streamlit Dashboard (legacy)",
       "runtimeExecutable": ".venv/Scripts/streamlit.exe",
-      "runtimeArgs": ["run", "app.py", "--server.port", "8501", "--server.headless", "true"],
+      "runtimeArgs": ["run", "legacy/app.py", "--server.port", "8501", "--server.headless", "true"],
       "port": 8501
+    },
+    {
+      "name": "Dashboard Backend (FastAPI)",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "backend.main:app", "--port", "8000", "--log-level", "warning"],
+      "port": 8000
     },
     {
       "name": "Dashboard Frontend (Vite)",

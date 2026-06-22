@@ -361,15 +361,23 @@ frontend/src/
 
 ## 11. 마이그레이션 단계 (무중단)
 
-| 단계 | 내용 | 검증 |
-|---|---|---|
-| 1 | **Engine Core 골격** — 타입/프로토콜만(`engine/core/`) | 단위 테스트 |
-| 2 | **Macro 리트로핏(무행동변화)** — S01~S06 모듈 추출, `MacroEngine.run()` + `_adapter_legacy` | 동결 payload **바이트 동일** |
-| 3 | **데이터 평면 확장** — 키리스부터(CBOE 풋콜·FINRA) = macro v3 Triage 동시 충족 | synthetic→실데이터 |
-| 4 | **Sector Engine** — 6모듈+rulebook, macro RRG를 §21/§24 단일원천 재사용 | 서버기동 |
-| 5 | **Stock Engine** — 8모듈+rulebook, Sector→Stock 인터페이스(§39 §5) 배선 | 서버기동 |
-| 6 | **프론트 드릴다운** — 프리미티브 3종 + Sector/Stock view + ContextRail | preview 검증 |
-| 7 | **Strategy Engine** — 마지막(verdict 누적 데이터 필요) | — |
+| 단계 | 내용 | 검증 | 상태(2026-06-22) |
+|---|---|---|---|
+| 1 | **Engine Core 골격** — 타입/프로토콜만(`engine/core/`) | 단위 테스트 | ✅ `642c53a` |
+| 2 | **Macro 리트로핏(무행동변화)** — S01~S06 모듈 추출, `MacroEngine.run()` + `_adapter_legacy` | 동결 payload **바이트 동일** | ✅ `25fc45c` (KOSPI·NASDAQ 등가성 통과) |
+| 3 | **데이터 평면 확장** — 키리스부터(CBOE 풋콜·FINRA) = macro v3 Triage 동시 충족 | synthetic→실데이터 | ⬜ 보류 (소비자=Stock §32/§33, 키/네트워크 필요 → Stage 5 심화 직전) |
+| 4 | **Sector Engine** — 6모듈+rulebook, macro RRG를 §21/§24 단일원천 재사용 | 서버기동 | 🟡 §21 RS만(`e58b7ed`, `/api/sectors`). §22~26·§24는 데이터 평면 후 |
+| 5 | **Stock Engine** — 8모듈+rulebook, Sector→Stock 인터페이스(§39 §5) 배선 | 서버기동 | 🟡 Price 레이어(§35 RS·§34 구조)만(`77e8e19`, `/api/stocks`). §31/§32/§33/§36은 데이터 평면 후 |
+| 6 | **프론트 드릴다운** — 프리미티브 3종 + Sector/Stock view + ContextRail | preview 검증 | 🟡 `<VerdictCard>`·`<ModuleCard>` + SectorView(`63c4a98`)·StockView(`fccf909`) preview 검증 완료. ContextRail은 미구현 |
+| 7 | **Strategy Engine** — 마지막(verdict 누적 데이터 필요) | — | ⬜ |
+| + | **캐스케이드** — `run_cascade` + `/api/briefing` (Macro→Sector→Stock context 전파) | context 체인 테스트 | ✅ `caf84bd` |
+
+> **진행 메모(2026-06-22)**: 3·4 순서 조정 — 3(데이터 평면)의 소비자는 5(Stock §32/§33)이고
+> 키/네트워크가 없는 환경이라 실데이터 검증 불가 → 기존 DB 데이터로 검증 가능한 4·5(Price/RS
+> 레이어)·6 프론트·캐스케이드를 먼저 구현. 남은 작업: ① 데이터 평면(3) — CBOE 풋콜/FINRA 공매도/
+> SEC/Finnhub provider, ② 그 위에 Sector §22~26 / Stock §31·§32·§33·§36 모듈, ③ ContextRail
+> 프론트(/api/briefing 소비), ④ Strategy Engine(7), ⑤ 고도 분리 마무리(leaders/sectors[]를
+> 동결 payload에서 제거 — 프론트가 신규 tier 엔드포인트로 완전 이전한 뒤).
 
 각 단계는 기존 워크플로(**synthetic 검증 → 실데이터 검증 → 서버기동 확인**) 그대로.
 
