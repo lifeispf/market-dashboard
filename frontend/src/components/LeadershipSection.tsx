@@ -11,15 +11,18 @@
 // `marketCap` instead (closest live analog of relative sector size).
 // quadrant comes pre-computed from the server (no client-side quadrant() recompute,
 // since rsRatio/rsMomentum here are centered on 100, not 1.0/0 like the prototype mock).
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import RRGChart from "./RRGChart";
 import { AlertTriangle } from "./icons";
 import { quadKr } from "../lib/helpers";
-import type { Sector, SectorLeaders } from "../api/types";
+import { fetchHistory, type Market, type Timeframe } from "../api/client";
+import type { Sector, SectorLeaders, TrailPoint } from "../api/types";
 
 interface LeadershipSectionProps {
   sectors: Sector[];
   leaders: Record<string, SectorLeaders>;
+  market: Market;
+  tf: Timeframe;
 }
 
 function treemapColor(ytd: number | null): string {
@@ -30,7 +33,7 @@ function treemapColor(ytd: number | null): string {
   return "rgba(208,107,74,.28)";
 }
 
-export default function LeadershipSection({ sectors, leaders }: LeadershipSectionProps) {
+export default function LeadershipSection({ sectors, leaders, market, tf }: LeadershipSectionProps) {
   const defaultCode = sectors.length
     ? sectors.reduce((a, b) => ((b.marketCap ?? 0) > (a.marketCap ?? 0) ? b : a)).code
     : null;
@@ -38,6 +41,30 @@ export default function LeadershipSection({ sectors, leaders }: LeadershipSectio
   // re-runs these initializers) on every market toggle — no effect-based reset needed.
   const [selSector, setSelSector] = useState<string | null>(defaultCode);
   const [selLeader, setSelLeader] = useState<string | null>(null);
+  const [trails, setTrails] = useState<Record<string, TrailPoint[]>>({});
+
+  // RRG trail overlay (Phase A) — fetch /api/history/{market}?tf= keyed on [market, tf]
+  // so the trail re-fetches on timeframe toggle. Failure degrades gracefully to no
+  // trails (RRGChart already handles missing/empty trails without crashing).
+  useEffect(() => {
+    let cancelled = false;
+    fetchHistory(market, tf)
+      .then((res) => {
+        if (cancelled) return;
+        const next: Record<string, TrailPoint[]> = {};
+        for (const s of res.sectors) {
+          if (s.trail && s.trail.length) next[s.code] = s.trail;
+        }
+        setTrails(next);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTrails({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [market, tf]);
 
   if (!sectors.length || !selSector) {
     return (
@@ -95,6 +122,7 @@ export default function LeadershipSection({ sectors, leaders }: LeadershipSectio
           <RRGChart
             sectors={sectors}
             selectedKey={selSector}
+            trails={trails}
             onSelect={(k) => {
               setSelSector(k);
               setSelLeader(null);

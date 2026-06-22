@@ -5,13 +5,14 @@
 // it surfaces the §21 relative-strength verdict layer the Sector Engine adds on
 // top of the existing RRG metrics shown in LeadershipSection.
 import { useEffect, useState } from "react";
-import { fetchSectors, type Market } from "../api/client";
+import { fetchSectors, type Market, type Timeframe } from "../api/client";
 import type { EngineOutput } from "../api/types";
 import VerdictCard from "../primitives/VerdictCard";
 import { RISK_PROFILE_KR, RISK_PROFILE_ORDER, riskProfileColumn, sectorMomentumScore, type RiskProfile } from "../lib/helpers";
 
 interface SectorViewProps {
   market: Market;
+  tf: Timeframe;
   nameByCode: Record<string, string>;
 }
 
@@ -38,7 +39,7 @@ function groupByRiskProfile(sectors: EngineOutput[]): Record<RiskProfile, Engine
   return groups;
 }
 
-export default function SectorView({ market, nameByCode }: SectorViewProps) {
+export default function SectorView({ market, tf, nameByCode }: SectorViewProps) {
   const [sectors, setSectors] = useState<EngineOutput[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +47,7 @@ export default function SectorView({ market, nameByCode }: SectorViewProps) {
     let cancelled = false;
     setSectors(null);
     setError(null);
-    fetchSectors(market)
+    fetchSectors(market, tf)
       .then((res) => {
         if (cancelled) return;
         setSectors(res.sectors);
@@ -58,7 +59,7 @@ export default function SectorView({ market, nameByCode }: SectorViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [market]);
+  }, [market, tf]);
 
   const columns = sectors ? groupByRiskProfile(sectors) : null;
 

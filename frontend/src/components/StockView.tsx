@@ -5,12 +5,13 @@
 // leaders shown in LeadershipSection. Stock names join from the frozen payload's
 // `leaders` block (code→{key,star}→ticker→name) — no backend change.
 import { useEffect, useState } from "react";
-import { fetchStocks, type Market } from "../api/client";
+import { fetchStocks, type Market, type Timeframe } from "../api/client";
 import type { EngineOutput, MarketPayload } from "../api/types";
 import VerdictCard from "../primitives/VerdictCard";
 
 interface StockViewProps {
   market: Market;
+  tf: Timeframe;
   leaders: MarketPayload["leaders"];
 }
 
@@ -23,7 +24,7 @@ function buildNameByTicker(leaders: MarketPayload["leaders"]): Record<string, st
   return map;
 }
 
-export default function StockView({ market, leaders }: StockViewProps) {
+export default function StockView({ market, tf, leaders }: StockViewProps) {
   const [stocks, setStocks] = useState<EngineOutput[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const nameByTicker = buildNameByTicker(leaders);
@@ -32,7 +33,7 @@ export default function StockView({ market, leaders }: StockViewProps) {
     let cancelled = false;
     setStocks(null);
     setError(null);
-    fetchStocks(market)
+    fetchStocks(market, tf)
       .then((res) => {
         if (cancelled) return;
         // Rank by verdict strength desc — strongest setups first.
@@ -46,7 +47,7 @@ export default function StockView({ market, leaders }: StockViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [market]);
+  }, [market, tf]);
 
   return (
     <div className="ld-section">

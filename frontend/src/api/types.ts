@@ -130,3 +130,26 @@ export interface StocksResponse {
   market: "KOSPI" | "NASDAQ";
   stocks: EngineOutput[];
 }
+
+// ---------------------------------------------------------------------------
+// History tier (NOT frozen) — mirror of backend/api/history.py. Sector RRG
+// trail (rsRatio/rsMomentum over time) for the trail-overlay feature in
+// LeadershipSection/RRGChart. New endpoint added for Phase A timeframes.
+// ---------------------------------------------------------------------------
+export interface TrailPoint {
+  date: string;
+  rsRatio: number | null;
+  rsMomentum: number | null;
+}
+
+export interface SectorTrail {
+  code: string;
+  trail: TrailPoint[] | null;
+}
+
+export interface HistoryResponse {
+  tier: "history";
+  market: "KOSPI" | "NASDAQ";
+  tf: string;
+  sectors: SectorTrail[];
+}

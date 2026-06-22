@@ -6,12 +6,24 @@ import { DirIcon } from "./icons";
 import Sparkline from "./Sparkline";
 import { fmt, fmtPct, fmtNum } from "../lib/helpers";
 import type { Flow } from "../api/types";
+import type { Timeframe } from "../api/client";
 
 interface FlowSectionProps {
   flow: Flow;
+  tf: Timeframe;
 }
 
-export default function FlowSection({ flow }: FlowSectionProps) {
+// tf-specific spark label + window wording (per plan §FlowSection — spark data itself
+// already arrives tf-correct from the payload; this just relabels the candle cadence).
+const SPARK_LABEL: Record<Timeframe, string> = {
+  "1D": "최근 추세 · 일봉",
+  "1W": "최근 추세 · 주봉",
+  "1M": "최근 추세 · 월봉",
+  "1Q": "최근 추세 · 분기봉",
+  "1Y": "최근 추세 · 연봉",
+};
+
+export default function FlowSection({ flow, tf }: FlowSectionProps) {
   const chgUp = (flow.chgPct ?? 0) >= 0;
   const volUp = flow.volDir === "up";
 
@@ -68,7 +80,7 @@ export default function FlowSection({ flow }: FlowSectionProps) {
       </div>
       <div className="ld-spark-wrap">
         <div className="ld-spark-head">
-          <div className="ld-spark-lab">최근 추세 · 상대형태(절대값 아님)</div>
+          <div className="ld-spark-lab">{SPARK_LABEL[tf]} · 상대형태(절대값 아님)</div>
           {sparkWindowPct !== null && (
             <span className={`ld-spark-badge c-${sparkUp ? "up" : "down"}`}>
               <DirIcon dir={sparkUp ? "up" : "down"} size={10} />

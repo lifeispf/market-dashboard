@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { fetchMarket, type Market } from "./api/client";
+import { fetchMarket, type Market, type Timeframe } from "./api/client";
 import type { MarketPayload } from "./api/types";
 import "./design/styles.css";
 
 import GlobalMacroBar from "./components/GlobalMacroBar";
 import Header from "./components/Header";
+import TimeframeSelector from "./components/TimeframeSelector";
 import CrossNarrativeBadge from "./components/CrossNarrativeBadge";
 import FlowSection from "./components/FlowSection";
 import LiquiditySection from "./components/LiquiditySection";
@@ -21,12 +22,13 @@ import Footer from "./components/Footer";
 // via fetchMarket() instead of the prototype's hardcoded MARKETS mock.
 function App() {
   const [market, setMarket] = useState<Market>("KOSPI");
+  const [tf, setTf] = useState<Timeframe>("1D");
   const [data, setData] = useState<MarketPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchMarket(market)
+    fetchMarket(market, tf)
       .then((payload) => {
         if (cancelled) return;
         setData(payload);
@@ -40,7 +42,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [market]);
+  }, [market, tf]);
 
   // Guard against a stale payload from the previous market flashing while the new
   // market's fetch is in flight (the cancelled-aware effect above clears `error` but
@@ -73,8 +75,11 @@ function App() {
       <GlobalMacroBar sources={payload.sources} />
       <div className="ld-wrap">
         <Header market={market} setMarket={setMarket} pill={payload.pill} asOf={payload.asOf} />
+        <div className="ld-tf-row">
+          <TimeframeSelector tf={tf} setTf={setTf} />
+        </div>
         <CrossNarrativeBadge narrative={payload.narrative} rec={payload.reconciliation} />
-        <FlowSection flow={payload.flow} />
+        <FlowSection flow={payload.flow} tf={tf} />
         <LiquiditySection
           bands={payload.bands}
           level={payload.flow.level}
@@ -83,13 +88,14 @@ function App() {
           reconciliation={payload.reconciliation}
           sources={payload.sources}
         />
-        <LeadershipSection key={market} sectors={payload.sectors} leaders={payload.leaders} />
+        <LeadershipSection key={market} sectors={payload.sectors} leaders={payload.leaders} market={market} tf={tf} />
         <SectorView
           key={`sv-${market}`}
           market={market}
+          tf={tf}
           nameByCode={Object.fromEntries(payload.sectors.map((s) => [s.code, s.name]))}
         />
-        <StockView key={`stk-${market}`} market={market} leaders={payload.leaders} />
+        <StockView key={`stk-${market}`} market={market} tf={tf} leaders={payload.leaders} />
         <WatchlistTable watchlist={payload.watchlist} />
         <FreshnessBar freshness={payload.freshness} />
         <Footer mode={payload._mode} source={payload.source} />
