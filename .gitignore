@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# SQLite — 생성/변동 데이터(ingest로 재생성 가능). 소스가 아니므로 추적 제외.
+*.db
+*.db-shm
+*.db-wal

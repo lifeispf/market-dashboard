@@ -1,0 +1,96 @@
+{
+  "multiple_anchors": {
+    "KOSPI":  { "base": [9, 10],   "bull": [10, 11],  "hyper": [13, 15] },
+    "NASDAQ": { "base": [23, 25],  "bull": [28, 30],  "hyper": [36, 38] }
+  },
+
+  "weights": {
+    "KOSPI":  { "S01": 0.25, "S02": 0.25, "S03": 0.15, "S04": 0.10, "S05": 0.15, "S06": 0.10 },
+    "NASDAQ": { "S01": 0.30, "S02": 0.05, "S03": 0.20, "S04": 0.20, "S05": 0.05, "S06": 0.20 }
+  },
+
+  "regime_cuts": [33, 66],
+
+  "rrg": { "ratio_window": 10, "momentum_window": 10 },
+
+  "manual_overrides": {
+    "KOSPI_forward_eps":       { "value": null, "as_of": null },
+    "NASDAQ_forward_eps":      { "value": null, "as_of": null },
+    "credit_balance_krw":      { "value": null, "as_of": null },
+    "mmf_total_usd":           { "value": null, "as_of": null },
+    "buyback_blackout":        { "value": false, "as_of": null },
+    "kospi_total_market_cap_krw": { "value": null, "as_of": null },
+    "fed_dot_plot_2026_cut":   { "value": null, "as_of": null },
+    "fed_hike_priced_pct":     { "value": null, "as_of": null },
+    "foreign_ownership_zscore": { "value": null, "as_of": null }
+  },
+
+  "staleness_days": { "daily": 3, "weekly": 10, "quarterly": 100 },
+
+  "thresholds": {
+    "S01_central_bank": {
+      "base_score": 20,
+      "dot_plot_2026_cut_bonus": 30,
+      "walcl_uptrend_bonus": 25,
+      "walcl_trend_lookback_weeks": 4,
+      "hike_priced_penalty": 20,
+      "hike_priced_threshold_pct": 50
+    },
+    "S02_foreign_flow_KR": {
+      "ownership_zscore_low": -1.3,
+      "score_at_zscore_low": 75,
+      "usdkrw_gate_threshold": 1500,
+      "usdkrw_gate_multiplier": 0.7,
+      "netbuy_direction_lookback_days": 5
+    },
+    "S03_domestic_credit_KR": {
+      "margin_ratio_low_pct": 0.5,
+      "margin_ratio_high_pct": 3.0,
+      "forced_liquidation_score_cap": 20,
+      "forced_liquidation_event": false
+    },
+    "S04_us_dry_powder": {
+      "mmf_aum_low_usd": 4000000000000,
+      "mmf_aum_high_usd": 7000000000000,
+      "real_rate_penalty_per_pct": 10,
+      "mmf_weekly_decline_bonus": 15
+    },
+    "S05_fx_KRW": {
+      "high_score_usdkrw_threshold": 1450,
+      "low_score_usdkrw_threshold": 1550,
+      "score_high": 90,
+      "score_low": 10
+    },
+    "S06_global_credit": {
+      "hy_oas_tight_pct": 3.0,
+      "hy_oas_wide_pct": 6.0,
+      "vix_low": 15,
+      "vix_high": 25,
+      "late_cycle_score_cap": 70
+    }
+  },
+
+  "fear_greed": {
+    "weights": { "F1": 0.25, "F2": 0.20, "F3": 0.20, "F4": 0.15, "F5": 0.10, "F6": 0.10 },
+    "cuts": [25, 45, 56, 75],
+    "anchors": {
+      "F1_momentum":  { "ma_window": 125, "lo_pct": -8, "hi_pct": 8 },
+      "F2_breadth":   { "lo": 0.30, "hi": 0.70 },
+      "F3_vol":       { "lo": 12, "hi": 30, "invert": true },
+      "F4_oas":       { "lo_pct": 3, "hi_pct": 6, "invert": true },
+      "F5_safehaven": { "window": 20, "lo_pct": -10, "hi_pct": 10,
+                        "safe_ticker_KR": null, "safe_ticker_US": "TLT" },
+      "F6_putcall":   { "lo": 0.7, "hi": 1.3, "invert": true, "enabled": false }
+    }
+  },
+
+  "watchlist": [
+    { "id": "fed_dot_plot",            "label": "Fed 점도표/WALCL",       "trigger": "인하 dot 부활 or WALCL 순증",        "signal": "green", "meaning": "완화 = hyper 연료 점화" },
+    { "id": "foreign_netsell_streak",  "label": "외국인 일별 순매수",       "trigger": "3일 연속 순매도",                   "signal": "red",   "meaning": "한계매수자 이탈" },
+    { "id": "margin_forced_liquidation","label": "신용잔고·반대매매",       "trigger": "잔고 급증 후 반대매매 출현",          "signal": "red",   "meaning": "hyper 붕괴 임계" },
+    { "id": "mmf_outflow",             "label": "MMF 총자산",             "trigger": "주간 감소 전환",                    "signal": "green", "meaning": "대기자금 회전 개시" },
+    { "id": "usdkrw_gate",             "label": "USD/KRW",               "trigger": "1,500 하회",                       "signal": "green", "meaning": "외인 게이트 개방" },
+    { "id": "credit_spread_vol",       "label": "HY OAS / VIX",          "trigger": "스프레드 확대 + 변동성 레짐 전환",     "signal": "red",   "meaning": "멀티플 전제 붕괴" },
+    { "id": "breadth_divergence",      "label": "breadth",               "trigger": "신고가에도 음수 지속",                "signal": "red",   "meaning": "집중심화·후기국면" }
+  ]
+}
