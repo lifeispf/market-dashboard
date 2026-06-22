@@ -53,6 +53,16 @@
 .c-up{color:var(--open)} .c-down{color:var(--tight)} .c-flat{color:var(--text-faint)}
 .ld-spark-wrap{margin-top:18px;background:var(--panel);border:1px solid var(--line-soft);border-radius:8px;padding:12px 16px}
 .ld-spark-lab{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);letter-spacing:.1em;margin-bottom:6px}
+.ld-spark-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.ld-spark-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--panel-2)}
+.ld-spark-badge.c-up{color:var(--open)}
+.ld-spark-badge.c-down{color:var(--tight)}
+.ld-spark-stats{position:relative}
+.ld-spark-refline{stroke:var(--text-faint);stroke-width:.5;stroke-dasharray:2 2;opacity:.55}
+.ld-spark-minmax{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--text-faint);margin-top:2px}
+.ld-spark-endpoints{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);margin-top:2px}
+.ld-spark-ep-first{color:var(--text-faint)}
+.ld-spark-ep-last{color:var(--text);font-weight:600}
 
 /* ceiling chart */
 .ld-grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:stretch}
@@ -99,6 +109,47 @@
 .ld-fg-factor .fn{font-family:var(--mono);min-width:54px;color:var(--text-faint)}
 .ld-fg-factor .track{flex:1}
 .ld-fg-factor .fv{font-family:var(--mono);min-width:34px;text-align:right;color:var(--text-faint)}
+
+/* bipolar diverging F&G gauge — centered at 50, 5 zones (extreme fear..extreme greed) */
+.ld-fg-bipolar{display:flex;flex-direction:column;gap:4px}
+.ld-fg-zones{position:relative;height:9px;border-radius:5px;overflow:visible;
+  background:linear-gradient(90deg,var(--fg-fear) 0%,var(--fg-fear) 23%,var(--fg-neutral) 42%,var(--fg-neutral) 58%,var(--fg-greed) 77%,var(--fg-greed) 100%);
+  opacity:.85;border:1px solid var(--line-soft)}
+.ld-fg-zone-tick{position:absolute;top:-2px;bottom:-2px;width:1px;background:rgba(11,20,24,.55)}
+.ld-fg-zone-mid{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(233,231,221,.6)}
+.ld-fg-needle{position:absolute;top:-4px;width:3px;height:17px;border-radius:2px;background:var(--text);box-shadow:0 0 0 1px var(--ink);transform:translateX(-1.5px)}
+.ld-fg-zone-labels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text-faint);letter-spacing:.06em}
+.ld-fg-interp{margin-top:8px;font-size:12px;color:var(--text-dim);font-weight:500}
+
+/* collapsible factor breakdown */
+.ld-fg-factors-details{margin-top:12px}
+.ld-fg-factors-details>summary{cursor:pointer;font-family:var(--mono);font-size:10.5px;color:var(--fg-neutral);letter-spacing:.04em;padding:4px 2px;list-style:none}
+.ld-fg-factors-details>summary::-webkit-details-marker{display:none}
+.ld-fg-factors-details>summary::before{content:"▸ ";color:var(--text-faint)}
+.ld-fg-factors-details[open]>summary::before{content:"▾ "}
+.ld-fg-factors-empty{font-size:11px;color:var(--text-faint);padding:4px 2px}
+
+/* distinct-from-CNN clarifying note */
+.ld-fg-note{margin-top:10px;font-size:10.5px;line-height:1.5;color:var(--text-faint)}
+
+/* band threshold tick marks — overlay on .track to show regime/headroom cut points */
+.ld-track-ticks{position:absolute;inset:0;pointer-events:none}
+.ld-track-tick{position:absolute;top:-1px;bottom:-1px;width:1px;background:rgba(233,231,221,.45)}
+
+/* compact source preview (6 mini-rows under the Regime gauge) */
+.ld-src-preview{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.ld-src-mini{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-soft);border-radius:5px;padding:6px 10px}
+.ld-src-mini-id{font-family:var(--mono);font-size:10px;color:var(--brass);min-width:34px}
+.ld-src-mini-track{flex:1;position:relative}
+.ld-src-mini-score{font-family:var(--mono);font-size:11.5px;font-weight:600;min-width:28px;text-align:right}
+.ld-src-mini-dir{display:inline-flex;align-items:center}
+
+/* collapsible full source detail cards */
+.ld-src-details{margin-top:10px}
+.ld-src-details>summary{cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--brass);letter-spacing:.04em;padding:6px 2px;list-style:none}
+.ld-src-details>summary::-webkit-details-marker{display:none}
+.ld-src-details>summary::before{content:"▸ ";color:var(--text-faint)}
+.ld-src-details[open]>summary::before{content:"▾ "}
 
 /* source panels */
 .ld-sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
@@ -186,6 +237,18 @@
 .sv-msg{font-family:var(--mono);font-size:12px;color:var(--text-faint);padding:14px 0}
 .vc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
 
+/* ---- SectorView 3-column risk-profile layout (공격/중립/방어) ---- */
+.sv-columns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.sv-col{display:flex;flex-direction:column;gap:12px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:8px;padding:14px}
+.sv-col-head{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--line-soft);padding-bottom:10px}
+.sv-col-label{font-family:var(--disp);font-size:14px;font-weight:600}
+.sv-col-label-offensive{color:var(--tight)}
+.sv-col-label-neutral{color:var(--neutral)}
+.sv-col-label-defensive{color:var(--open)}
+.sv-col-subtitle{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);letter-spacing:.02em}
+.sv-col-grid{grid-template-columns:1fr}
+.sv-col-empty{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);padding:6px 0}
+
 .vc-card{background:var(--panel);border:1px solid var(--line-soft);border-radius:7px;padding:15px 16px;display:flex;flex-direction:column;gap:9px}
 .vc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .vc-title-wrap{display:flex;flex-direction:column;gap:1px}
@@ -227,4 +290,5 @@
   .ld-grid2{grid-template-columns:1fr}
   .ld-grid3{grid-template-columns:1fr}
   .vc-grid{grid-template-columns:1fr}
+  .sv-columns{grid-template-columns:1fr}
 }

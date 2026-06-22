@@ -88,6 +88,23 @@ export function fearGreedColor(score: number | null): string {
   return "neutral";
 }
 
+// Fear & Greed score (0-100|null) -> band key + short KR interpretation.
+// Cut points (25/45/56/75) mirror the server's LABEL_BANDS: <25 Extreme Fear, <45 Fear,
+// <56 Neutral, <75 Greed, else Extreme Greed. F&G is bipolar — both extremes are signals
+// (reversal risk), unlike a simple 0=bad/100=good headroom metric.
+export type FearGreedBand = "extreme_fear" | "fear" | "neutral" | "greed" | "extreme_greed";
+
+export function fearGreedInterpretation(score: number | null): { band: FearGreedBand | null; text: string } {
+  if (score === null || score === undefined || Number.isNaN(score)) {
+    return { band: null, text: "산정 불가 (데이터 부족)" };
+  }
+  if (score < 25) return { band: "extreme_fear", text: "극단적 공포 — 과매도 반전 가능" };
+  if (score < 45) return { band: "fear", text: "공포 우위" };
+  if (score < 56) return { band: "neutral", text: "중립" };
+  if (score < 75) return { band: "greed", text: "탐욕 우위" };
+  return { band: "extreme_greed", text: "극단적 탐욕 — 과매수 경고" };
+}
+
 // ---- Engine Core envelope display helpers (tier-agnostic) ----
 
 // Verdict.direction -> brass-system color bucket (open=green/up, neutral=gold, tight=red/down).
@@ -136,4 +153,32 @@ const SIZE_HINT: Record<string, { label: string; color: string }> = {
 export function sizeHint(hint: unknown): { label: string; color: string } | null {
   if (typeof hint !== "string") return null;
   return SIZE_HINT[hint] ?? null;
+}
+
+// risk_profile (sector Verdict.extra, static risk-appetite/cyclicality class) -> 3-column key.
+// Always defaults to "neutral" for missing/unexpected values (null-safe per backend contract).
+export type RiskProfile = "offensive" | "neutral" | "defensive";
+
+export function riskProfileColumn(extra: Record<string, unknown> | null | undefined): RiskProfile {
+  const v = extra?.risk_profile;
+  if (v === "offensive" || v === "neutral" || v === "defensive") return v;
+  return "neutral";
+}
+
+// Column display metadata, ordered left(공격) -> center(중립) -> right(방어).
+export const RISK_PROFILE_KR: Record<RiskProfile, { label: string; subtitle: string; color: string }> = {
+  offensive: { label: "공격", subtitle: "고베타·경기민감", color: "tight" },
+  neutral: { label: "중립", subtitle: "혼합·중간베타", color: "neutral" },
+  defensive: { label: "방어", subtitle: "저베타·필수소비", color: "open" },
+};
+
+export const RISK_PROFILE_ORDER: RiskProfile[] = ["offensive", "neutral", "defensive"];
+
+// Signed momentum score for within-column sort: direction sign * strength, strongest mover on top.
+// strong_up/up -> +1, strong_down/down -> -1, neutral -> 0; multiplied by strength (0..4).
+export function sectorMomentumScore(verdict: { direction: Direction; strength: number }): number {
+  const sign = verdict.direction === "strong_up" || verdict.direction === "up" ? 1
+    : verdict.direction === "strong_down" || verdict.direction === "down" ? -1
+    : 0;
+  return sign * verdict.strength;
 }

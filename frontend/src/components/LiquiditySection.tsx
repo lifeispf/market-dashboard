@@ -19,6 +19,21 @@ interface LiquiditySectionProps {
   sources: Source[];
 }
 
+// Regime composite band cut points (BASE | BULL | HYPER) — mirrors regimeLabel() in helpers.ts.
+const REGIME_TICKS = [34, 67];
+// Headroom-word cut points (tight | neutral | open) — mirrors headroomColor() in helpers.ts.
+const HEADROOM_TICKS = [35, 60];
+
+function BandTicks({ ticks }: { ticks: number[] }) {
+  return (
+    <div className="ld-track-ticks">
+      {ticks.map((t) => (
+        <span className="ld-track-tick" key={t} style={{ left: `${t}%` }} />
+      ))}
+    </div>
+  );
+}
+
 export default function LiquiditySection({ bands, level, regime, fearGreed, reconciliation, sources }: LiquiditySectionProps) {
   const composite = regime.composite;
   const fillBucket = composite === null ? "locked" : composite >= 67 ? "tight" : composite >= 34 ? "neutral" : "open";
@@ -47,8 +62,9 @@ export default function LiquiditySection({ bands, level, regime, fearGreed, reco
               <div className="ld-avail">
                 반영소스 {regime.nAvailable}/{regime.nTotal}
               </div>
-              <div className="track" style={{ marginTop: 10 }}>
+              <div className="track" style={{ marginTop: 10, position: "relative" }}>
                 <div className={`fill f-${fillBucket}`} style={{ width: (composite ?? 0) + "%" }} />
+                <BandTicks ticks={REGIME_TICKS} />
               </div>
             </div>
             <div className="ld-reconcile">
@@ -78,29 +94,48 @@ export default function LiquiditySection({ bands, level, regime, fearGreed, reco
         </div>
         <FearGreedGauge fearGreed={fearGreed} />
       </div>
-      <div className="ld-sources">
+      <div className="ld-src-preview">
         {sources.map((s) => (
-          <div className="ld-src" key={s.id}>
-            <div className="ld-src-top">
-              <span className="ld-src-id">{s.id}</span>
-              <span className="ld-src-name">{s.name}</span>
-              <span className="ld-src-scope">{s.scope}</span>
-            </div>
-            <div className="ld-src-state">{s.state}</div>
-            <div className="ld-src-gauge-row">
-              <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-faint)" }}>헤드룸</span>
-              <span className="gv">{s.headroom === null ? "N/A" : `${s.headroom}/100`}</span>
-            </div>
-            <div className="track">
+          <div className="ld-src-mini" key={s.id}>
+            <span className="ld-src-mini-id">{s.id}</span>
+            <div className="track ld-src-mini-track">
               <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
+              <BandTicks ticks={HEADROOM_TICKS} />
             </div>
-            <div className={`ld-dir c-${headroomColor(s.headroom)}`}>
-              <DirIcon dir={s.dir} size={11} />
-              {s.dirLabel}
-            </div>
+            <span className="ld-src-mini-score">{s.score === null ? "N/A" : Math.round(s.score)}</span>
+            <span className={`ld-src-mini-dir c-${headroomColor(s.headroom)}`}>
+              <DirIcon dir={s.dir} size={10} />
+            </span>
           </div>
         ))}
       </div>
+      <details className="ld-src-details">
+        <summary>6개 원천 상세 펼치기</summary>
+        <div className="ld-sources">
+          {sources.map((s) => (
+            <div className="ld-src" key={s.id}>
+              <div className="ld-src-top">
+                <span className="ld-src-id">{s.id}</span>
+                <span className="ld-src-name">{s.name}</span>
+                <span className="ld-src-scope">{s.scope}</span>
+              </div>
+              <div className="ld-src-state">{s.state}</div>
+              <div className="ld-src-gauge-row">
+                <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-faint)" }}>헤드룸</span>
+                <span className="gv">{s.headroom === null ? "N/A" : `${s.headroom}/100`}</span>
+              </div>
+              <div className="track" style={{ position: "relative" }}>
+                <div className={`fill f-${headroomColor(s.headroom)}`} style={{ width: (s.headroom ?? 0) + "%" }} />
+                <BandTicks ticks={HEADROOM_TICKS} />
+              </div>
+              <div className={`ld-dir c-${headroomColor(s.headroom)}`}>
+                <DirIcon dir={s.dir} size={11} />
+                {s.dirLabel}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

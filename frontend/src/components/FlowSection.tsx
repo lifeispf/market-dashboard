@@ -15,6 +15,15 @@ export default function FlowSection({ flow }: FlowSectionProps) {
   const chgUp = (flow.chgPct ?? 0) >= 0;
   const volUp = flow.volDir === "up";
 
+  // window % change over the spark series itself (NOT flow.chgPct, which is 1D) —
+  // spark[last]/spark[0] - 1, null-safe when spark is too short.
+  const spark = flow.spark;
+  const hasSpark = !!spark && spark.length >= 2;
+  const sparkFirst = hasSpark ? spark[0] : null;
+  const sparkLast = hasSpark ? spark[spark.length - 1] : null;
+  const sparkWindowPct = hasSpark && sparkFirst !== null && sparkFirst !== 0 ? (sparkLast! / sparkFirst! - 1) * 100 : null;
+  const sparkUp = (sparkWindowPct ?? 0) >= 0;
+
   return (
     <div className="ld-section">
       <div className="ld-sec-head">
@@ -58,8 +67,16 @@ export default function FlowSection({ flow }: FlowSectionProps) {
         </div>
       </div>
       <div className="ld-spark-wrap">
-        <div className="ld-spark-lab">최근 추세 (상대 형태)</div>
-        <Sparkline data={flow.spark} />
+        <div className="ld-spark-head">
+          <div className="ld-spark-lab">최근 추세 · 상대형태(절대값 아님)</div>
+          {sparkWindowPct !== null && (
+            <span className={`ld-spark-badge c-${sparkUp ? "up" : "down"}`}>
+              <DirIcon dir={sparkUp ? "up" : "down"} size={10} />
+              {fmtPct(sparkWindowPct, 1)} (창 구간)
+            </span>
+          )}
+        </div>
+        <Sparkline data={flow.spark} showStats />
       </div>
     </div>
   );
