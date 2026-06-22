@@ -27,12 +27,10 @@ anymore, only wiring.
 """
 from fastapi import APIRouter, HTTPException
 
-import scoring
-from backend.store import db
 from data import leadership_fetcher
 
 from ._adapter_legacy import legacy_payload
-from ._assembly_helpers import _cached_market_cap, _cached_series, _last, _safe, _ytd_slice
+from ._assembly_helpers import _cached_series, _last, _safe, _ytd_slice
 from .mock_data import MOCK_PAYLOADS
 
 router = APIRouter()
@@ -81,82 +79,26 @@ def _assemble_live(market: str) -> dict:
 
 
 def _assemble_sectors_leaders(market: str, inputs) -> tuple[list[dict], dict]:
-    """Sectors / RRG / leaders — copied verbatim out of the pre-retrofit
-    `_assemble_live` monolith (calculation logic unchanged, only relocated into
-    its own function so the new engine-routed `_assemble_live` can call it).
+    """Sectors / RRG / leaders — transitional macro-payload assembly.
 
-    `inputs` is the MacroInputs this request's gather_macro_inputs() already
-    produced -- registry/sectors_config/today/level_series are read off it
-    instead of being re-fetched, so this performs exactly the same DB
-    read-through calls (same cache keys) as the monolith did inline.
+    Stage 4 (00_architecture.md §11): the sector RRG metric loop now lives in
+    engine/sector/inputs.py:gather_sector_inputs (single source — same RRG
+    computation the new SectorEngine and the /api/sectors endpoint use). This
+    function maps those rows to the frozen `sectors[]` shape and keeps the
+    leaders[] assembly inline (leaders -> Stock tier in Stage 5).
+
+    byte-identical to the pre-retrofit output is guarded by
+    engine/tests/test_macro_equivalence.py: gather_sector_inputs uses the same
+    DB read-through cache keys, so same-day data is identical.
     """
-    config = inputs.config
-    sectors_config = inputs.sectors_config
+    from engine.sector.inputs import gather_sector_inputs, sector_rows_to_payload
+
+    sectors_out = sector_rows_to_payload(gather_sector_inputs(market))
+
     registry = inputs.registry
-    today = inputs.today
-    level_series = inputs.level_series
+    sectors_config = inputs.sectors_config
     as_of = inputs.as_of
-
-    benchmark_series = level_series
     sector_defs = sectors_config[market]["sectors"]
-    sector_rows = []
-    # app.py uses a single YTD-windowed sector_series for BOTH the YTD% calc and the RRG
-    # compute_rs_ratio_momentum() call (cached_ticker_series(etf/tk, "ytd")) -- there is no
-    # separate full-history series for sectors at all. compute_rs_ratio_momentum only needs
-    # ratio_window+momentum_window+1 (21 by default config) overlapping points, well inside
-    # a ~113-170 trading-day YTD window, so mirroring app.py exactly loses nothing here.
-    benchmark_ytd = _ytd_slice(benchmark_series)
-    for code, sdef in sector_defs.items():
-        if "etf" in sdef and sdef["etf"] in registry:
-            etf = sdef["etf"]
-            fetch_fn, source = registry[etf]
-            full_series = _cached_series(etf, fetch_fn, source, lookback_days=400)
-            sector_series = _ytd_slice(full_series)
-        else:
-            const_full = []
-            for tk in sdef.get("tickers", []):
-                if tk not in registry:
-                    continue
-                fetch_fn, source = registry[tk]
-                const_full.append(_cached_series(tk, fetch_fn, source, lookback_days=400))
-            # build_aggregate_series() rebases each constituent to 100 at ITS OWN first
-            # point (scoring.py docstring: "each rebased to 100 at its first point") --
-            # so constituents must be sliced to the YTD window BEFORE aggregating, mirroring
-            # app.py's cached_ticker_series(tk, "ytd") which constrains the fetch itself.
-            # Aggregating the full multi-year history first and slicing afterwards anchors
-            # the rebase at ~400 days ago instead of Jan 1, inflating YTD% for anything with
-            # a multi-year uptrend (caught by the app.py cross-check in verification).
-            const_ytd = [_ytd_slice(s) for s in const_full]
-            sector_series = scoring.build_aggregate_series(const_ytd)
-
-        market_caps = [_cached_market_cap(tk) for tk in sdef.get("tickers", [])]
-        sector_cap = sum(c for c in market_caps if c) or None
-
-        ytd = leadership_fetcher.ytd_pct(sector_series) if sector_series is not None else None
-        rs_r, rs_m = (
-            scoring.compute_rs_ratio_momentum(
-                sector_series, benchmark_ytd,
-                ratio_window=config["rrg"]["ratio_window"], momentum_window=config["rrg"]["momentum_window"],
-            )
-            if sector_series is not None and benchmark_ytd is not None
-            else (None, None)
-        )
-        quadrant = scoring.rrg_quadrant(rs_r, rs_m)
-        sector_rows.append({
-            "code": code, "name": sdef["name"], "market_cap": sector_cap,
-            "ytd": ytd, "rs_ratio": rs_r, "rs_momentum": rs_m, "quadrant": quadrant,
-        })
-        _safe(lambda code=code, sector_cap=sector_cap, ytd=ytd, rs_r=rs_r, rs_m=rs_m, quadrant=quadrant: db.upsert_sector_metric(
-            market, code, today, sector_cap, ytd, rs_r, rs_m, quadrant,
-        ))
-
-    sectors_out = [
-        {
-            "code": r["code"], "name": r["name"], "marketCap": r["market_cap"], "ytd": r["ytd"],
-            "rsRatio": r["rs_ratio"], "rsMomentum": r["rs_momentum"], "quadrant": r["quadrant"],
-        }
-        for r in sector_rows
-    ]
 
     leaders_out = {}
     for code, sdef in sector_defs.items():
