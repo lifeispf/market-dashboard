@@ -23,6 +23,7 @@ from engine.core.timeframes import (
     rrg_window_for,
     spark_n_for,
 )
+from backend.api.history import SCORE_FIELDS, get_history
 from engine.macro.inputs import gather_macro_inputs
 from engine.sector.inputs import gather_sector_inputs
 from engine.stock.inputs import gather_stock_inputs
@@ -221,6 +222,57 @@ class RrgDegradeOnShortSeriesTests(unittest.TestCase):
         self.assertIsNone(rs_r)
         self.assertIsNone(rs_m)
         self.assertIsNone(scoring.rrg_quadrant(rs_r, rs_m))
+
+
+class HistoryEndpointScoreAndFearGreedTests(unittest.TestCase):
+    """Phase B: /api/history/{market} must additionally expose `scores` (per-field
+    score trend resampled to tf) and `fearGreed` (best-effort recomputed trend),
+    alongside the existing `sectors` trail block. Calls the handler function
+    directly (no HTTP) per the test brief. Values are data-dependent (scores_daily
+    is sparse in dev), so these assert STRUCTURE + no-crash, not specific numbers."""
+
+    def _assert_points_shape(self, points):
+        self.assertIsInstance(points, list)
+        for p in points:
+            self.assertIn("date", p)
+            self.assertIn("value", p)
+            self.assertIsInstance(p["date"], str)
+            self.assertIsInstance(p["value"], float)
+
+    def _assert_response_shape(self, payload):
+        # existing Phase A keys must still be present (sectors trail untouched)
+        self.assertIn("sectors", payload)
+        self.assertIn("scores", payload)
+        self.assertIn("fearGreed", payload)
+
+        scores = payload["scores"]
+        self.assertEqual(set(scores.keys()), set(SCORE_FIELDS))
+        for field in SCORE_FIELDS:
+            self._assert_points_shape(scores[field])
+
+        self._assert_points_shape(payload["fearGreed"])
+
+    def test_kospi_1d_no_crash_and_shape(self):
+        payload = get_history("KOSPI", tf="1D")
+        self._assert_response_shape(payload)
+
+    def test_kospi_1w_no_crash_and_shape(self):
+        payload = get_history("KOSPI", tf="1W")
+        self._assert_response_shape(payload)
+
+    def test_nasdaq_1d_no_crash_and_shape(self):
+        payload = get_history("NASDAQ", tf="1D")
+        self._assert_response_shape(payload)
+
+    def test_nasdaq_1w_no_crash_and_shape(self):
+        payload = get_history("NASDAQ", tf="1W")
+        self._assert_response_shape(payload)
+
+    def test_unknown_market_still_404s(self):
+        from fastapi import HTTPException
+
+        with self.assertRaises(HTTPException):
+            get_history("BOGUS", tf="1D")
 
 
 if __name__ == "__main__":
