@@ -59,7 +59,14 @@ class StockRulebook:
             return Verdict(
                 direction="neutral", strength=0, conviction=None, lead_pattern=None,
                 narrative="종목 가격 관측 불가 — 판단 보류.", risks=["no_data"], invalidation=[],
-                horizon="T1", verified=False, extra={"position_size_hint": "avoid"},
+                horizon="T1", verified=False,
+                extra={
+                    "position_size_hint": "avoid",
+                    "sector_code": rs.inputs.get("sector_code") if rs else None,
+                    "sector_rs_ratio": rs.inputs.get("sector_rs_ratio") if rs else None,
+                    "sector_rs_momentum": rs.inputs.get("sector_rs_momentum") if rs else None,
+                    "sector_quadrant": rs.inputs.get("sector_quadrant") if rs else None,
+                },
             )
 
         risks: list[str] = []
@@ -106,5 +113,9 @@ class StockRulebook:
                 "quadrant": rs.inputs.get("quadrant") if rs else None,
                 "trend_dir": ps.inputs.get("trend_dir") if ps else None,
                 "above_ma200": ps.inputs.get("above_ma200") if ps else None,
+                "sector_code": rs.inputs.get("sector_code") if rs else None,
+                "sector_rs_ratio": rs.inputs.get("sector_rs_ratio") if rs else None,
+                "sector_rs_momentum": rs.inputs.get("sector_rs_momentum") if rs else None,
+                "sector_quadrant": rs.inputs.get("sector_quadrant") if rs else None,
             },
         )

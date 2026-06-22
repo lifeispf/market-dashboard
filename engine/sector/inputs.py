@@ -122,6 +122,34 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
     return sector_rows
 
 
+def build_sector_price_series(sdef: dict, registry: dict):
+    """섹터 하나의 YTD 가격 시리즈를 만든다(ETF-or-aggregate) — `gather_sector_inputs`의
+    섹터 시리즈 구성 로직을 표준화한 ADDITIVE 헬퍼(기존 함수는 변경하지 않음).
+
+    Phase C: `gather_stock_inputs`가 종목의 Sector-RS(자기 섹터 대비) 계산을 위해
+    재사용한다. `gather_sector_inputs`와 동일한 분기(ETF 우선, 없으면 constituents
+    aggregate)를 standalone으로 노출 — 호출부가 sectors_config/registry만 들고
+    있으면 macro 경로 없이도 같은 섹터 시리즈를 얻을 수 있다.
+
+    Returns:
+        `_ytd_slice`된 섹터 가격 시리즈(pandas Series) 또는 데이터 부족 시 None.
+    """
+    if "etf" in sdef and sdef["etf"] in registry:
+        etf = sdef["etf"]
+        fetch_fn, source = registry[etf]
+        full_series = _cached_series(etf, fetch_fn, source, lookback_days=400)
+        return _ytd_slice(full_series)
+
+    const_full = []
+    for tk in sdef.get("tickers", []):
+        if tk not in registry:
+            continue
+        fetch_fn, source = registry[tk]
+        const_full.append(_cached_series(tk, fetch_fn, source, lookback_days=400))
+    const_ytd = [_ytd_slice(s) for s in const_full]
+    return scoring.build_aggregate_series(const_ytd)
+
+
 def sector_rows_to_payload(rows: list[SectorRow]) -> list[dict[str, Any]]:
     """SectorRow 리스트를 동결 `sectors[]` payload shape(camelCase)로 매핑한다.
 

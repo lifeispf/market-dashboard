@@ -20,6 +20,7 @@ from backend.store import series_map
 from config_loader import load_sectors
 from data import leadership_fetcher
 from engine.core.timeframes import normalize_tf, resample_for_tf, rrg_window_for
+from engine.sector.inputs import build_sector_price_series
 
 from backend.api._assembly_helpers import (
     _cached_series,
@@ -47,6 +48,10 @@ class StockRow:
     trend_dir: str | None       # "up" | "down" | "flat" | None
     vol: float | None           # realized volatility (20d)
     above_ma200: bool | None    # price >= 200d MA (None = 데이터 부족)
+    # Phase C: Sector RS (vs 자기 섹터 시리즈) — Market RS와 동일 공식, 벤치마크만 교체.
+    sector_rs_ratio: float | None = None
+    sector_rs_momentum: float | None = None
+    sector_quadrant: str | None = None
 
 
 def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
@@ -58,8 +63,14 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
     Phase A: `tf`는 Market RS(rs_ratio/rs_momentum/quadrant, vs 지수)에만 영향을
     준다 — 종목 YTD/벤치마크 시리즈를 resample_for_tf로 리샘플하고 rrg_window_for(tf)
     를 ratio/momentum window로 쓴다. tf="1D"는 identity·window=10이라 기존과 동일.
-    Sector-RS는 Phase C 범위(여기서 다루지 않음). Price-구조 필드(trend_dir/vol/
-    above_ma200)는 Phase A에서 현행 일별 계산 그대로 유지한다.
+    Price-구조 필드(trend_dir/vol/above_ma200)는 Phase A에서 현행 일별 계산 그대로
+    유지한다.
+
+    Phase C: Sector-RS(sector_rs_ratio/sector_rs_momentum/sector_quadrant, vs 자기
+    섹터 시리즈)를 추가로 계산한다. 섹터 시리즈는 `engine.sector.inputs.
+    build_sector_price_series`(ETF-or-aggregate, gather_sector_inputs와 동일 로직)로
+    구성하고, Market RS와 동일하게 resample_for_tf + rrg_window_for(tf)를 적용한다.
+    sector_defs를 순회하므로 섹터 시리즈는 섹터당 한 번만 계산(캐시 재사용).
     """
     tf = normalize_tf(tf)
     sectors_config = load_sectors()
@@ -76,6 +87,12 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
     rows: list[StockRow] = []
     seen: set[str] = set()
     for code, sdef in sector_defs.items():
+        # Phase C: 이 섹터의 가격 시리즈(ETF-or-aggregate) — 섹터당 한 번만 구성해
+        # 그 섹터의 모든 종목이 재사용한다(gather_sector_inputs와 동일 로직, 읽기전용
+        # 헬퍼로 replicate — gather_sector_inputs 자체는 무수정).
+        sector_ytd_series = build_sector_price_series(sdef, registry)
+        resampled_sector_series = resample_for_tf(sector_ytd_series, tf)
+
         tickers = list(sdef.get("key", [])) + list(sdef.get("star", []))
         for tk in tickers:
             if tk in seen:
@@ -105,6 +122,17 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
             )
             quadrant = scoring.rrg_quadrant(rs_r, rs_m)
 
+            # Phase C: Sector RS — Market RS와 동일 공식, 벤치마크만 자기 섹터 시리즈로 교체.
+            sector_rs_r, sector_rs_m = (
+                scoring.compute_rs_ratio_momentum(
+                    resampled_ytd, resampled_sector_series,
+                    ratio_window=rrg_window, momentum_window=rrg_window,
+                )
+                if resampled_ytd is not None and resampled_sector_series is not None
+                else (None, None)
+            )
+            sector_quadrant = scoring.rrg_quadrant(sector_rs_r, sector_rs_m)
+
             trend_dir = scoring.trend_direction(full_series, lookback=5) if full_series is not None else None
             vol = scoring.realized_volatility(full_series, window=20) if full_series is not None else None
             above_ma200 = None
@@ -126,6 +154,9 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
                     trend_dir=trend_dir,
                     vol=vol,
                     above_ma200=above_ma200,
+                    sector_rs_ratio=sector_rs_r,
+                    sector_rs_momentum=sector_rs_m,
+                    sector_quadrant=sector_quadrant,
                 )
             )
 

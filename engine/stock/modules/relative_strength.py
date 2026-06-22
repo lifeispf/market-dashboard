@@ -57,12 +57,16 @@ class StockRelativeStrengthModule:
                 module_id=self.id, state=None, transition=None, strength=None,
                 confidence=None, narrative="상대강도 데이터 없음(RRG 산정 불가).",
                 inputs={"rs_ratio": data.rs_ratio, "rs_momentum": data.rs_momentum,
-                        "quadrant": data.quadrant, "scope": "market_rs", "approximation": "single_window"},
+                        "quadrant": data.quadrant, "scope": "market_rs", "approximation": "single_window",
+                        "sector_code": data.sector_code, "sector_rs_ratio": data.sector_rs_ratio,
+                        "sector_rs_momentum": data.sector_rs_momentum, "sector_quadrant": data.sector_quadrant},
             )
         state, transition, strength = interp
         return ModuleOutput(
             module_id=self.id, state=state, transition=transition, strength=strength,
             confidence=None, narrative=_QUADRANT_NARRATIVE[data.quadrant],
             inputs={"rs_ratio": data.rs_ratio, "rs_momentum": data.rs_momentum,
-                    "quadrant": data.quadrant, "scope": "market_rs", "approximation": "single_window"},
+                    "quadrant": data.quadrant, "scope": "market_rs", "approximation": "single_window",
+                    "sector_code": data.sector_code, "sector_rs_ratio": data.sector_rs_ratio,
+                    "sector_rs_momentum": data.sector_rs_momentum, "sector_quadrant": data.sector_quadrant},
         )

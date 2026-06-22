@@ -15,11 +15,16 @@ from engine.stock.engine import build_stock_engine, run_stocks
 from engine.stock.inputs import StockRow
 
 
-def _row(quadrant=None, trend_dir=None, above_ma200=None, ticker="005930.KS"):
+def _row(
+    quadrant=None, trend_dir=None, above_ma200=None, ticker="005930.KS",
+    sector_rs_ratio=103.0, sector_rs_momentum=101.0, sector_quadrant="leading",
+):
     return StockRow(
         ticker=ticker, name="삼성전자", sector_code="semi", sector_name="반도체",
         price=70000.0, ytd=12.0, rs_ratio=105.0, rs_momentum=102.0,
         quadrant=quadrant, trend_dir=trend_dir, vol=0.2, above_ma200=above_ma200,
+        sector_rs_ratio=sector_rs_ratio, sector_rs_momentum=sector_rs_momentum,
+        sector_quadrant=sector_quadrant,
     )
 
 
@@ -61,6 +66,18 @@ class StockPatternTests(unittest.TestCase):
         self.assertEqual(out.verdict.direction, "neutral")
         self.assertEqual(out.mode, "degraded")
         self.assertEqual(out.verdict.extra["position_size_hint"], "avoid")
+
+    def test_sector_rs_flows_through_to_verdict_extra(self):
+        # Phase C: Sector-RS(자기 섹터 대비)가 StockRow -> module -> verdict.extra로
+        # 손실 없이 흘러야 한다(Market RS와 별개 축).
+        out = self._run(
+            quadrant="leading", trend_dir="up", above_ma200=True,
+            sector_rs_ratio=108.5, sector_rs_momentum=104.2, sector_quadrant="leading",
+        )
+        self.assertEqual(out.verdict.extra["sector_code"], "semi")
+        self.assertEqual(out.verdict.extra["sector_rs_ratio"], 108.5)
+        self.assertEqual(out.verdict.extra["sector_rs_momentum"], 104.2)
+        self.assertEqual(out.verdict.extra["sector_quadrant"], "leading")
 
     def test_sector_breakdown_cascade_downgrades(self):
         # 상위 섹터가 Breakdown이면 Trend Leader(strong_up)가 한 단계 강등(up).
