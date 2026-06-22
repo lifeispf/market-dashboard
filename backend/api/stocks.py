@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from engine.core.timeframes import normalize_tf
 from engine.stock.engine import run_stocks
 
 router = APIRouter()
@@ -21,12 +22,13 @@ VALID_MARKETS = ("KOSPI", "NASDAQ")
 
 
 @router.get("/api/stocks/{market}")
-def get_stocks(market: str):
+def get_stocks(market: str, tf: str = "1D"):
     market = market.upper()
     if market not in VALID_MARKETS:
         raise HTTPException(status_code=404, detail=f"unknown market: {market}")
+    tf = normalize_tf(tf)
     try:
-        outputs = run_stocks(market)
+        outputs = run_stocks(market, tf=tf)
     except Exception as exc:  # never 500 — graceful degradation(§9.3)
         raise HTTPException(status_code=503, detail=f"stock assembly failed: {exc}")
     return {

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from engine.core.timeframes import normalize_tf
 from engine.sector.engine import run_sectors
 
 router = APIRouter()
@@ -21,12 +22,13 @@ VALID_MARKETS = ("KOSPI", "NASDAQ")
 
 
 @router.get("/api/sectors/{market}")
-def get_sectors(market: str):
+def get_sectors(market: str, tf: str = "1D"):
     market = market.upper()
     if market not in VALID_MARKETS:
         raise HTTPException(status_code=404, detail=f"unknown market: {market}")
+    tf = normalize_tf(tf)
     try:
-        outputs = run_sectors(market)
+        outputs = run_sectors(market, tf=tf)
     except Exception as exc:  # never 500 — graceful degradation(§9.3)
         raise HTTPException(status_code=503, detail=f"sector assembly failed: {exc}")
     return {

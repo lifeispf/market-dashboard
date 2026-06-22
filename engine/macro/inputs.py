@@ -30,6 +30,7 @@ from backend import scoring_ext
 from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import kr_fetcher, manual
+from engine.core.timeframes import normalize_tf, resample_for_tf, spark_n_for
 
 from backend.api._assembly_helpers import _cached_series, _last, _as_of_str, _safe
 
@@ -125,14 +126,21 @@ class MacroInputs:
     fear_greed: dict[str, Any] = field(default_factory=dict)
 
 
-def gather_macro_inputs(market: str) -> MacroInputs:
+def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
     """_assemble_live의 fetch/원시계산 영역을 그대로 수행해 MacroInputs를 채운다.
 
     계산식은 한 글자도 바꾸지 않는다 -- 아래 본문은 backend/api/market.py의
     pre-retrofit `_assemble_live` 본문에서 sectors/leaders/narrative/sources/
     watchlist/freshness/payload 조립 부분을 제외한, 데이터 수집과 S01-S06/
     fear_greed 산출 영역의 정확한 복사다.
+
+    Phase A: `tf`는 ONLY `spark`에 영향을 준다 (Class A 윈도우-종속 지표 중 이
+    모듈이 노출하는 유일한 필드). vol_value/yoy_pct/S01-S06/fear_greed 등은 Phase
+    A 범위 밖(Class B — 점수-추세는 history.py가 별도로 다룸)이라 tf="1D" 기본값
+    경로와 동일하게 그대로 둔다. tf="1D"는 resample_for_tf가 identity이므로 spark도
+    기존 `level_series.iloc[-60:]`와 byte-identical하다.
     """
+    tf = normalize_tf(tf)
     config = load_config()
     sectors_config = load_sectors()
     registry = series_map.build_registry(market, sectors_config)
@@ -203,7 +211,12 @@ def gather_macro_inputs(market: str) -> MacroInputs:
         vix_series = _cached_series("fred:vix", *registry["fred:vix"], lookback_days=30)
         vol_value = _last(vix_series)
 
-    spark = [round(v, 2) for v in level_series.iloc[-60:].tolist()] if level_series is not None and len(level_series) >= 2 else []
+    spark_series = resample_for_tf(level_series, tf)
+    spark = (
+        [round(v, 2) for v in spark_series.iloc[-spark_n_for(tf):].tolist()]
+        if spark_series is not None and len(spark_series) >= 2
+        else []
+    )
     vol_dir = scoring.trend_direction(level_series, lookback=5) or "flat"
 
     # ---- S01-S06 raw inputs (market-independent FRED + KR-specific) ----

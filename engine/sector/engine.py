@@ -32,7 +32,7 @@ def build_sector_engine() -> Engine:
     )
 
 
-def run_sectors(market: str, ctx: "Context | None" = None) -> list["EngineOutput"]:
+def run_sectors(market: str, ctx: "Context | None" = None, tf: str = "1D") -> list["EngineOutput"]:
     """market의 모든 섹터를 Sector Engine으로 돌려 EngineOutput 리스트 반환.
 
     Args:
@@ -40,6 +40,8 @@ def run_sectors(market: str, ctx: "Context | None" = None) -> list["EngineOutput
         ctx: 상위(macro) Context. None이면 Context.root(market)로 단독 실행
             (캐스케이드 없이) — /api/sectors 단독 호출용. 전체 캐스케이드
             (macro→sector)는 /api/briefing이 Context.from_macro로 주입한다.
+        tf: 타임프레임("1D"|"1W"|"1M"|"1Q"|"1Y", 기본 "1D") — RRG 리샘플/윈도우
+            번들을 결정한다(engine/core/timeframes.py). 기본값은 기존과 동일.
 
     Returns:
         섹터별 EngineOutput 리스트(entity_id = 섹터 code).
@@ -47,5 +49,5 @@ def run_sectors(market: str, ctx: "Context | None" = None) -> list["EngineOutput
     if ctx is None:
         ctx = Context.root(market)
     engine = build_sector_engine()
-    rows = gather_sector_inputs(market)
+    rows = gather_sector_inputs(market, tf=tf)
     return [engine.run(row.code, ctx, data=row) for row in rows]

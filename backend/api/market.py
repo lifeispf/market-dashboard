@@ -28,6 +28,7 @@ anymore, only wiring.
 from fastapi import APIRouter, HTTPException
 
 from data import leadership_fetcher
+from engine.core.timeframes import normalize_tf
 
 from ._adapter_legacy import legacy_payload
 from ._assembly_helpers import _cached_series, _last, _safe, _ytd_slice
@@ -45,40 +46,45 @@ LIVE_MODE = True
 # ---- assembly ---------------------------------------------------------------
 
 
-def assemble_payload(market: str) -> dict:
+def assemble_payload(market: str, tf: str = "1D") -> dict:
     """Builds the full live market payload. Falls back to the mock shape (with
     _mode left as "mock") only if live assembly raises -- which it is designed not
     to, since every external call below is individually guarded."""
     try:
-        return _assemble_live(market)
+        return _assemble_live(market, tf=tf)
     except Exception as exc:  # last-resort safety net; live assembly should never reach here
         payload = dict(MOCK_PAYLOADS[market])
         payload["_mode"] = f"mock (live assembly failed: {exc})"
         return payload
 
 
-def _assemble_live(market: str) -> dict:
+def _assemble_live(market: str, tf: str = "1D") -> dict:
     """Stage 2: routes through the macro Engine Core path. This function must
     NEVER call backend/api/_reference_assembly.py:assemble_live_reference -- that
     module is the frozen oracle this path is checked against, not a dependency
-    of it."""
+    of it.
+
+    Phase A: `tf` (default "1D") threads into gather_macro_inputs (spark) and
+    _assemble_sectors_leaders (sector RRG). tf="1D" reproduces the exact
+    pre-Phase-A call graph -- this is the byte-identical invariant the
+    test_macro_equivalence regression gate checks."""
     from engine.core.context import Context
     from engine.macro.engine import build_macro_engine
     from engine.macro.inputs import gather_macro_inputs
     from engine.macro.rulebook import MacroRulebook
 
-    inputs = gather_macro_inputs(market)
+    inputs = gather_macro_inputs(market, tf=tf)
 
     engine = build_macro_engine()
     engine.rulebook = MacroRulebook(inputs)  # inject this request's raw data source
     engine_output = engine.run(market, Context.root(market), data=inputs)
 
-    sectors_out, leaders_out = _assemble_sectors_leaders(market, inputs)
+    sectors_out, leaders_out = _assemble_sectors_leaders(market, inputs, tf=tf)
 
     return legacy_payload(market, engine_output, inputs, sectors_out, leaders_out)
 
 
-def _assemble_sectors_leaders(market: str, inputs) -> tuple[list[dict], dict]:
+def _assemble_sectors_leaders(market: str, inputs, tf: str = "1D") -> tuple[list[dict], dict]:
     """Sectors / RRG / leaders — transitional macro-payload assembly.
 
     Stage 4 (00_architecture.md §11): the sector RRG metric loop now lives in
@@ -93,7 +99,7 @@ def _assemble_sectors_leaders(market: str, inputs) -> tuple[list[dict], dict]:
     """
     from engine.sector.inputs import gather_sector_inputs, sector_rows_to_payload
 
-    sectors_out = sector_rows_to_payload(gather_sector_inputs(market))
+    sectors_out = sector_rows_to_payload(gather_sector_inputs(market, tf=tf))
 
     registry = inputs.registry
     sectors_config = inputs.sectors_config
@@ -134,8 +140,8 @@ def _assemble_sectors_leaders(market: str, inputs) -> tuple[list[dict], dict]:
 
 
 @router.get("/api/market/{market}")
-def get_market(market: str):
+def get_market(market: str, tf: str = "1D"):
     market = market.upper()
     if market not in VALID_MARKETS:
         raise HTTPException(status_code=404, detail=f"unknown market: {market}")
-    return assemble_payload(market)
+    return assemble_payload(market, tf=normalize_tf(tf))

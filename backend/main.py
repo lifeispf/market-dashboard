@@ -5,7 +5,7 @@ Run from the workspace root:  uvicorn backend.main:app --reload --port 8000
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import briefing, health, market, sectors, stocks
+from .api import briefing, health, history, market, sectors, stocks
 from .store import db
 
 app = FastAPI(title="Liquidity Ceiling Dashboard API", version="0.1.0-poc")
@@ -22,6 +22,7 @@ app.include_router(market.router)
 app.include_router(sectors.router)
 app.include_router(stocks.router)
 app.include_router(briefing.router)
+app.include_router(history.router)
 app.include_router(health.router)
 
 

@@ -20,6 +20,7 @@ import scoring
 from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import leadership_fetcher
+from engine.core.timeframes import normalize_tf, resample_for_tf, rrg_window_for
 
 from backend.api._assembly_helpers import (
     _cached_market_cap,
@@ -46,14 +47,21 @@ class SectorRow:
     quadrant: str | None
 
 
-def gather_sector_inputs(market: str) -> list[SectorRow]:
+def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
     """_assemble_sectors_leaders의 섹터 metric 루프를 그대로 수행해 SectorRow
-    리스트를 반환한다(계산식 변경 없음).
+    리스트를 반환한다(계산식 변경 없음 — tf="1D"는 byte-identical).
 
     standalone — config/sectors_config/registry/level_series를 자체 구성하므로
     /api/sectors 엔드포인트가 macro 경로 없이 단독 호출할 수 있다. DB read-through
     캐시 키가 macro 경로와 동일하므로 같은 날 동일 데이터를 본다(byte-identical).
+
+    Phase A: `tf`는 RRG(rs_ratio/rs_momentum/quadrant)에만 영향을 준다 — 섹터/벤치마크
+    시리즈를 resample_for_tf로 리샘플하고 rrg_window_for(tf)를 ratio/momentum window로
+    쓴다. tf="1D"는 resample=identity·window=10(config["rrg"]와 동일)이라 기존과
+    동일하다. DB upsert(sector_metrics_daily)는 tf=="1D"일 때만 수행 — 비-1D 리샘플
+    값으로 일별 히스토리를 오염시키지 않는다.
     """
+    tf = normalize_tf(tf)
     config = load_config()
     sectors_config = load_sectors()
     registry = series_map.build_registry(market, sectors_config)
@@ -87,12 +95,16 @@ def gather_sector_inputs(market: str) -> list[SectorRow]:
         sector_cap = sum(c for c in market_caps if c) or None
 
         ytd = leadership_fetcher.ytd_pct(sector_series) if sector_series is not None else None
+
+        resampled_sector = resample_for_tf(sector_series, tf)
+        resampled_benchmark = resample_for_tf(benchmark_ytd, tf)
+        rrg_window = rrg_window_for(tf)
         rs_r, rs_m = (
             scoring.compute_rs_ratio_momentum(
-                sector_series, benchmark_ytd,
-                ratio_window=config["rrg"]["ratio_window"], momentum_window=config["rrg"]["momentum_window"],
+                resampled_sector, resampled_benchmark,
+                ratio_window=rrg_window, momentum_window=rrg_window,
             )
-            if sector_series is not None and benchmark_ytd is not None
+            if resampled_sector is not None and resampled_benchmark is not None
             else (None, None)
         )
         quadrant = scoring.rrg_quadrant(rs_r, rs_m)
@@ -102,9 +114,10 @@ def gather_sector_inputs(market: str) -> list[SectorRow]:
                 ytd=ytd, rs_ratio=rs_r, rs_momentum=rs_m, quadrant=quadrant,
             )
         )
-        _safe(lambda code=code, sector_cap=sector_cap, ytd=ytd, rs_r=rs_r, rs_m=rs_m, quadrant=quadrant: db.upsert_sector_metric(
-            market, code, today, sector_cap, ytd, rs_r, rs_m, quadrant,
-        ))
+        if tf == "1D":
+            _safe(lambda code=code, sector_cap=sector_cap, ytd=ytd, rs_r=rs_r, rs_m=rs_m, quadrant=quadrant: db.upsert_sector_metric(
+                market, code, today, sector_cap, ytd, rs_r, rs_m, quadrant,
+            ))
 
     return sector_rows
 

@@ -34,6 +34,7 @@ def build_stock_engine() -> Engine:
 def run_stocks(
     market: str,
     ctx_by_sector: "dict[str, Context] | None" = None,
+    tf: str = "1D",
 ) -> list["EngineOutput"]:
     """market의 모든 key/star 종목을 Stock Engine으로 돌려 EngineOutput 리스트 반환.
 
@@ -42,12 +43,14 @@ def run_stocks(
         ctx_by_sector: 섹터코드 -> 그 섹터의 Context(상위 sector verdict 포함).
             None이면 종목마다 Context.root(market)로 단독 실행(캐스케이드 없음).
             전체 캐스케이드(macro→sector→stock)는 /api/briefing이 주입한다.
+        tf: 타임프레임("1D"|"1W"|"1M"|"1Q"|"1Y", 기본 "1D") — Market RS 리샘플/
+            윈도우 번들을 결정한다. 기본값은 기존과 동일.
 
     Returns:
         종목별 EngineOutput 리스트(entity_id = ticker).
     """
     engine = build_stock_engine()
-    rows: list[StockRow] = gather_stock_inputs(market)
+    rows: list[StockRow] = gather_stock_inputs(market, tf=tf)
     outputs: list[EngineOutput] = []
     for row in rows:
         if ctx_by_sector and row.sector_code in ctx_by_sector:

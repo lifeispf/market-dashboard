@@ -17,8 +17,9 @@ from datetime import date
 
 import scoring
 from backend.store import series_map
-from config_loader import load_config, load_sectors
+from config_loader import load_sectors
 from data import leadership_fetcher
+from engine.core.timeframes import normalize_tf, resample_for_tf, rrg_window_for
 
 from backend.api._assembly_helpers import (
     _cached_series,
@@ -48,13 +49,19 @@ class StockRow:
     above_ma200: bool | None    # price >= 200d MA (None = 데이터 부족)
 
 
-def gather_stock_inputs(market: str) -> list[StockRow]:
+def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
     """market의 모든 key/star 종목에 대해 Price-레이어 StockRow 리스트를 만든다.
 
     standalone — config/registry/index를 자체 구성하므로 /api/stocks가 단독
     호출 가능. DB read-through 캐시 키가 macro/leaders 경로와 동일.
+
+    Phase A: `tf`는 Market RS(rs_ratio/rs_momentum/quadrant, vs 지수)에만 영향을
+    준다 — 종목 YTD/벤치마크 시리즈를 resample_for_tf로 리샘플하고 rrg_window_for(tf)
+    를 ratio/momentum window로 쓴다. tf="1D"는 identity·window=10이라 기존과 동일.
+    Sector-RS는 Phase C 범위(여기서 다루지 않음). Price-구조 필드(trend_dir/vol/
+    above_ma200)는 Phase A에서 현행 일별 계산 그대로 유지한다.
     """
-    config = load_config()
+    tf = normalize_tf(tf)
     sectors_config = load_sectors()
     registry = series_map.build_registry(market, sectors_config)
 
@@ -62,9 +69,8 @@ def gather_stock_inputs(market: str) -> list[StockRow]:
     index_fetch_fn, index_source = registry[index_id]
     level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=400)
     benchmark_ytd = _ytd_slice(level_series)
-
-    ratio_window = config["rrg"]["ratio_window"]
-    momentum_window = config["rrg"]["momentum_window"]
+    resampled_benchmark = resample_for_tf(benchmark_ytd, tf)
+    rrg_window = rrg_window_for(tf)
 
     sector_defs = sectors_config[market]["sectors"]
     rows: list[StockRow] = []
@@ -88,12 +94,13 @@ def gather_stock_inputs(market: str) -> list[StockRow]:
             ytd_series = _ytd_slice(full_series)
             ytd = leadership_fetcher.ytd_pct(ytd_series) if ytd_series is not None else None
 
+            resampled_ytd = resample_for_tf(ytd_series, tf)
             rs_r, rs_m = (
                 scoring.compute_rs_ratio_momentum(
-                    ytd_series, benchmark_ytd,
-                    ratio_window=ratio_window, momentum_window=momentum_window,
+                    resampled_ytd, resampled_benchmark,
+                    ratio_window=rrg_window, momentum_window=rrg_window,
                 )
-                if ytd_series is not None and benchmark_ytd is not None
+                if resampled_ytd is not None and resampled_benchmark is not None
                 else (None, None)
             )
             quadrant = scoring.rrg_quadrant(rs_r, rs_m)
