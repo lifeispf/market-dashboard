@@ -19,7 +19,7 @@ import scoring
 from backend.store import series_map
 from config_loader import load_sectors
 from data import leadership_fetcher
-from engine.core.timeframes import normalize_tf, resample_for_tf, rrg_window_for
+from engine.core.timeframes import lookback_days_for, normalize_tf, resample_for_tf, rrg_window_for
 from engine.sector.inputs import build_sector_price_series
 
 from backend.api._assembly_helpers import (
@@ -75,12 +75,14 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
     tf = normalize_tf(tf)
     sectors_config = load_sectors()
     registry = series_map.build_registry(market, sectors_config)
+    lookback_days = lookback_days_for(tf)
 
     index_id = series_map.index_series_id(market)
     index_fetch_fn, index_source = registry[index_id]
-    level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=400)
+    level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=lookback_days)
     benchmark_ytd = _ytd_slice(level_series)
-    resampled_benchmark = resample_for_tf(benchmark_ytd, tf)
+    benchmark_rrg = benchmark_ytd if tf == "1D" else level_series
+    resampled_benchmark = resample_for_tf(benchmark_rrg, tf)
     rrg_window = rrg_window_for(tf)
 
     sector_defs = sectors_config[market]["sectors"]
@@ -90,7 +92,7 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
         # Phase C: 이 섹터의 가격 시리즈(ETF-or-aggregate) — 섹터당 한 번만 구성해
         # 그 섹터의 모든 종목이 재사용한다(gather_sector_inputs와 동일 로직, 읽기전용
         # 헬퍼로 replicate — gather_sector_inputs 자체는 무수정).
-        sector_ytd_series = build_sector_price_series(sdef, registry)
+        sector_ytd_series = build_sector_price_series(sdef, registry, tf)
         resampled_sector_series = resample_for_tf(sector_ytd_series, tf)
 
         tickers = list(sdef.get("key", [])) + list(sdef.get("star", []))
@@ -102,7 +104,7 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
             full_series = None
             if tk in registry:
                 fetch_fn, source = registry[tk]
-                full_series = _cached_series(tk, fetch_fn, source, lookback_days=400)
+                full_series = _cached_series(tk, fetch_fn, source, lookback_days=lookback_days)
 
             price = _last(full_series)
             if price is None:
@@ -111,7 +113,8 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
             ytd_series = _ytd_slice(full_series)
             ytd = leadership_fetcher.ytd_pct(ytd_series) if ytd_series is not None else None
 
-            resampled_ytd = resample_for_tf(ytd_series, tf)
+            stock_rrg_input = ytd_series if tf == "1D" else full_series
+            resampled_ytd = resample_for_tf(stock_rrg_input, tf)
             rs_r, rs_m = (
                 scoring.compute_rs_ratio_momentum(
                     resampled_ytd, resampled_benchmark,

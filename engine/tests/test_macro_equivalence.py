@@ -11,13 +11,52 @@ stdlib unittest (venv에 pytest 미설치). 작업 지시(00_architecture.md §1
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from backend.api._reference_assembly import assemble_live_reference
 from backend.api.market import _assemble_live
+from backend.store.db import get_connection
+from engine.macro import eps_source, inputs as macro_inputs
+
+
+def _purge_eps_cache():
+    """Delete any cached eps:KOSPI / eps:NASDAQ rows.
+
+    engine/macro/inputs.py caches the forward-EPS proxy fetch in series_daily via the
+    same read-through helper everything else uses (_cached_series), which short-circuits
+    to the already-stored value once fetched_at is today -- regardless of whether the
+    fetch_fn is monkeypatched afterwards. In this dev environment a `uvicorn
+    backend.main:app` server may be running concurrently and serving real dashboard
+    requests, which would otherwise populate a real (non-None) eps:* value for today and
+    silently defeat the monkeypatch below via that cache. Purging before AND after each
+    test keeps the window in which a concurrent request could repopulate it as small as
+    possible (full elimination of the race isn't possible with a shared SQLite file and
+    an external writer, but this makes the test self-healing on every run).
+    """
+    with get_connection() as conn:
+        conn.execute("DELETE FROM series_daily WHERE series_id IN ('eps:KOSPI', 'eps:NASDAQ')")
+        conn.commit()
 
 
 class MacroEquivalenceTests(unittest.TestCase):
-    """새 engine-routed _assemble_live가 동결 오라클과 byte-identical인지 검증."""
+    """새 engine-routed _assemble_live가 동결 오라클과 byte-identical인지 검증.
+
+    Phase D-②: `engine/macro/inputs.py` now tries a live forward-EPS proxy fetch
+    (engine.macro.eps_source.fetch_forward_eps) when no manual override is present.
+    That is a DELIBERATE NEW live input -- the frozen oracle (_reference_assembly.py)
+    only ever reads EPS via manual.get_override and must never change. So for the
+    duration of this byte-identical comparison we monkeypatch the new EPS source to
+    return None (its own graceful-degrade value), putting both sides back on equal
+    footing: EPS=None on both, which is exactly what this gate was built to validate
+    (engine-path/legacy-path logic parity), not the new EPS feature itself.
+    """
+
+    def setUp(self):
+        _purge_eps_cache()
+        patcher = patch.object(eps_source, "fetch_forward_eps", return_value=None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(_purge_eps_cache)
 
     def test_kospi_byte_identical(self):
         new_payload = _assemble_live("KOSPI")
@@ -28,6 +67,40 @@ class MacroEquivalenceTests(unittest.TestCase):
         new_payload = _assemble_live("NASDAQ")
         ref_payload = assemble_live_reference("NASDAQ")
         self.assertEqual(new_payload, ref_payload)
+
+
+class ForwardEpsSourceTests(unittest.TestCase):
+    """D-② new module: never raises, degrades to None, lights up bands when present."""
+
+    def test_fetch_forward_eps_never_raises_and_returns_none_or_positive_float(self):
+        for market in ("NASDAQ", "KOSPI", "UNKNOWN"):
+            for level in (None, 0, -5, 100.0, 20000.0):
+                try:
+                    result = eps_source.fetch_forward_eps(market, level)
+                except Exception as e:  # pragma: no cover - the whole point is this never fires
+                    self.fail(f"fetch_forward_eps raised {e!r} for market={market} level={level}")
+                self.assertTrue(result is None or (isinstance(result, float) and result > 0))
+
+    def test_injected_eps_lights_up_bands_and_position(self):
+        # gather_macro_inputs only tries the eps_source fallback when manual.get_override
+        # returns None (the real-world default, since config.json has no manual_overrides
+        # entry for *_forward_eps in this repo). Inject a fixed positive value and confirm
+        # levels/position (-> bands/reconciliation/fwdPER downstream) light up instead of
+        # staying null.
+        #
+        # gather_macro_inputs persists the injected EPS into series_daily (series_id
+        # "eps:NASDAQ") via the same-day read-through cache, which would otherwise leak
+        # this test's fixed 123.45 into any other test calling gather_macro_inputs("NASDAQ")
+        # / _assemble_live("NASDAQ") for the rest of the day (e.g. test_nasdaq_byte_identical
+        # above, depending on unittest's run order). Clean the row up afterwards so this
+        # test is self-contained.
+        self.addCleanup(_purge_eps_cache)
+
+        with patch.object(eps_source, "fetch_forward_eps", return_value=123.45):
+            result = macro_inputs.gather_macro_inputs("NASDAQ")
+        self.assertIsNotNone(result.forward_eps)
+        self.assertIsNotNone(result.levels)
+        self.assertIsNotNone(result.position)
 
 
 if __name__ == "__main__":

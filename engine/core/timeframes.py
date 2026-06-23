@@ -72,3 +72,13 @@ def rrg_window_for(tf: str) -> int:
 
 def spark_n_for(tf: str) -> int:
     return TIMEFRAMES[normalize_tf(tf)].spark_n
+
+
+_LOOKBACK_DAYS = {"1D": 400, "1W": 600, "1M": 1300, "1Q": 2200, "1Y": 4000}
+
+
+def lookback_days_for(tf: str) -> int:
+    """tf별 시리즈 조회기간(일). Phase D-⑥: backfill로 깊어진 series_daily(~1825행)를
+    1M/1Q/1Y가 실제로 읽을 수 있도록 tf가 길수록 더 깊이 읽는다. tf="1D"는 400으로
+    기존과 동일 -- byte-identical 불변식 보증."""
+    return _LOOKBACK_DAYS.get(normalize_tf(tf), 400)

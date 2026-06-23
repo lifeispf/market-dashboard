@@ -20,7 +20,7 @@ import scoring
 from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import leadership_fetcher
-from engine.core.timeframes import normalize_tf, resample_for_tf, rrg_window_for
+from engine.core.timeframes import lookback_days_for, normalize_tf, resample_for_tf, rrg_window_for
 
 from backend.api._assembly_helpers import (
     _cached_market_cap,
@@ -67,37 +67,41 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
     registry = series_map.build_registry(market, sectors_config)
     today = date.today()
 
+    lookback_days = lookback_days_for(tf)
     index_id = series_map.index_series_id(market)
     index_fetch_fn, index_source = registry[index_id]
-    level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=400)
+    level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=lookback_days)
 
     benchmark_series = level_series
     sector_defs = sectors_config[market]["sectors"]
     sector_rows: list[SectorRow] = []
     benchmark_ytd = _ytd_slice(benchmark_series)
+    benchmark_for_rrg = benchmark_ytd if tf == "1D" else benchmark_series
     for code, sdef in sector_defs.items():
         if "etf" in sdef and sdef["etf"] in registry:
             etf = sdef["etf"]
             fetch_fn, source = registry[etf]
-            full_series = _cached_series(etf, fetch_fn, source, lookback_days=400)
+            full_series = _cached_series(etf, fetch_fn, source, lookback_days=lookback_days)
             sector_series = _ytd_slice(full_series)
+            sector_series_for_rrg = sector_series if tf == "1D" else full_series
         else:
             const_full = []
             for tk in sdef.get("tickers", []):
                 if tk not in registry:
                     continue
                 fetch_fn, source = registry[tk]
-                const_full.append(_cached_series(tk, fetch_fn, source, lookback_days=400))
+                const_full.append(_cached_series(tk, fetch_fn, source, lookback_days=lookback_days))
             const_ytd = [_ytd_slice(s) for s in const_full]
             sector_series = scoring.build_aggregate_series(const_ytd)
+            sector_series_for_rrg = sector_series if tf == "1D" else scoring.build_aggregate_series(const_full)
 
         market_caps = [_cached_market_cap(tk) for tk in sdef.get("tickers", [])]
         sector_cap = sum(c for c in market_caps if c) or None
 
         ytd = leadership_fetcher.ytd_pct(sector_series) if sector_series is not None else None
 
-        resampled_sector = resample_for_tf(sector_series, tf)
-        resampled_benchmark = resample_for_tf(benchmark_ytd, tf)
+        resampled_sector = resample_for_tf(sector_series_for_rrg, tf)
+        resampled_benchmark = resample_for_tf(benchmark_for_rrg, tf)
         rrg_window = rrg_window_for(tf)
         rs_r, rs_m = (
             scoring.compute_rs_ratio_momentum(
@@ -122,8 +126,8 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
     return sector_rows
 
 
-def build_sector_price_series(sdef: dict, registry: dict):
-    """섹터 하나의 YTD 가격 시리즈를 만든다(ETF-or-aggregate) — `gather_sector_inputs`의
+def build_sector_price_series(sdef: dict, registry: dict, tf: str = "1D"):
+    """섹터 하나의 가격 시리즈를 만든다(ETF-or-aggregate) — `gather_sector_inputs`의
     섹터 시리즈 구성 로직을 표준화한 ADDITIVE 헬퍼(기존 함수는 변경하지 않음).
 
     Phase C: `gather_stock_inputs`가 종목의 Sector-RS(자기 섹터 대비) 계산을 위해
@@ -131,23 +135,32 @@ def build_sector_price_series(sdef: dict, registry: dict):
     aggregate)를 standalone으로 노출 — 호출부가 sectors_config/registry만 들고
     있으면 macro 경로 없이도 같은 섹터 시리즈를 얻을 수 있다.
 
+    Phase D-⑥: `tf`가 tf-aware lookback(lookback_days_for)으로 시리즈를 읽고,
+    tf="1D"일 때만 `_ytd_slice`를 적용한다(기존 동작과 byte-identical). 비-1D는
+    backfill로 깊어진 전체 시리즈를 그대로 반환 — 이후 resample_for_tf가 처리한다.
+
     Returns:
-        `_ytd_slice`된 섹터 가격 시리즈(pandas Series) 또는 데이터 부족 시 None.
+        tf="1D" -> `_ytd_slice`된 섹터 가격 시리즈; 그 외 -> 전체(deep) 섹터 가격
+        시리즈(pandas Series) 또는 데이터 부족 시 None.
     """
+    tf = normalize_tf(tf)
+    lookback_days = lookback_days_for(tf)
     if "etf" in sdef and sdef["etf"] in registry:
         etf = sdef["etf"]
         fetch_fn, source = registry[etf]
-        full_series = _cached_series(etf, fetch_fn, source, lookback_days=400)
-        return _ytd_slice(full_series)
+        full_series = _cached_series(etf, fetch_fn, source, lookback_days=lookback_days)
+        return _ytd_slice(full_series) if tf == "1D" else full_series
 
     const_full = []
     for tk in sdef.get("tickers", []):
         if tk not in registry:
             continue
         fetch_fn, source = registry[tk]
-        const_full.append(_cached_series(tk, fetch_fn, source, lookback_days=400))
-    const_ytd = [_ytd_slice(s) for s in const_full]
-    return scoring.build_aggregate_series(const_ytd)
+        const_full.append(_cached_series(tk, fetch_fn, source, lookback_days=lookback_days))
+    if tf == "1D":
+        const_ytd = [_ytd_slice(s) for s in const_full]
+        return scoring.build_aggregate_series(const_ytd)
+    return scoring.build_aggregate_series(const_full)
 
 
 def sector_rows_to_payload(rows: list[SectorRow]) -> list[dict[str, Any]]:

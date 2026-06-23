@@ -30,7 +30,8 @@ from backend import scoring_ext
 from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import kr_fetcher, manual
-from engine.core.timeframes import normalize_tf, resample_for_tf, spark_n_for
+from engine.core.timeframes import lookback_days_for, normalize_tf, resample_for_tf, spark_n_for
+from engine.macro import eps_source
 
 from backend.api._assembly_helpers import _cached_series, _last, _as_of_str, _safe
 
@@ -148,7 +149,7 @@ def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
 
     index_id = series_map.index_series_id(market)
     index_fetch_fn, index_source = registry[index_id]
-    level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=400)
+    level_series = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=lookback_days_for(tf))
     level = _last(level_series)
     as_of = _as_of_str(level_series) or today.isoformat()
 
@@ -167,6 +168,30 @@ def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
         anchors = config["multiple_anchors"]["NASDAQ"]
 
     forward_eps, eps_as_of, _eps_missing = manual.get_override(config, eps_key)
+
+    # ---- D-② new live input: forward-EPS proxy fetch (engine/macro/eps_source.py) ----
+    # manual.get_override only returns a value if an operator typed one into
+    # config.json's manual_overrides (almost never true in practice), which left the
+    # ceiling band/reconciliation/fwdPER permanently null. When no manual override is
+    # present, try a best-effort ETF-proxy-derived implied forward EPS instead (see
+    # eps_source.py docstring for the approximation caveat). This is a NEW live input
+    # outside the retrofit's frozen-oracle scope (test_macro_equivalence monkeypatches
+    # it to None so the byte-identical gate still validates pre-existing logic parity).
+    # Cached via the existing read-through series pattern (series_id="eps:{market}")
+    # so we don't hit yfinance on every request.
+    if forward_eps is None:
+        eps_series_id = f"eps:{market}"
+
+        def _eps_fetch_fn(_lookback_days, _level=level, _market=market):
+            value = eps_source.fetch_forward_eps(_market, _level)
+            return [(today, value)] if value is not None else []
+
+        eps_proxy_series = _cached_series(eps_series_id, _eps_fetch_fn, "yfinance(proxy,추정)", lookback_days=1)
+        eps_proxy_value = _last(eps_proxy_series)
+        if eps_proxy_value is not None:
+            forward_eps = eps_proxy_value
+            eps_as_of = date.fromisoformat(_as_of_str(eps_proxy_series) or today.isoformat())
+
     position = scoring.band_position(level, forward_eps, anchors) if level is not None else None
     levels = scoring.ceiling_levels(forward_eps, anchors)
 
