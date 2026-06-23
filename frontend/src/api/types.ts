@@ -211,3 +211,76 @@ export interface HistoryResponse {
   scores: Record<string, ScorePoint[]>;
   fearGreed: ScorePoint[];
 }
+
+// ---------------------------------------------------------------------------
+// Verification tier (Phase F, NOT frozen) — mirror of backend GET
+// /api/verification/{market}. Full-history (tf-independent) scorecard of
+// measured signal reliability (IC / hit-rate / sample size), distinct from
+// the live ranking signals shown elsewhere. Any leaf metric may be null
+// (insufficient data) and any section may instead degrade to {error:string}
+// — every consumer must treat both shapes as "unavailable" without crashing.
+// ---------------------------------------------------------------------------
+
+// fear_greed_extremes["21"|"63"].greed / .fear
+export interface FgExtremeSide {
+  mean_fwd_ret_pct: number | null;
+  // greed side reports pct_negative (down-move confirms reversal), fear side
+  // reports pct_positive (up-move confirms reversal) — both optional/null-safe
+  // since either key may be absent depending on which side this is.
+  pct_negative?: number | null;
+  pct_positive?: number | null;
+  n: number | null;
+}
+
+export interface FgExtremeHorizon {
+  greed: FgExtremeSide | null;
+  fear: FgExtremeSide | null;
+}
+
+// Keyed by horizon-days string ("21","63",...); section itself may be {error}.
+export type FgExtremes = Record<string, FgExtremeHorizon> | { error: string };
+
+export interface RrgHitRate {
+  horizon_days: number | null;
+  hit_rate_bullish: number | null;
+  n_bullish: number | null;
+  hit_rate_bearish: number | null;
+  n_bearish: number | null;
+}
+
+export interface MomentumIc {
+  ic: number | null;
+  n: number | null;
+  desc?: string;
+}
+
+export interface RegimeFactorEntry {
+  ic: number | null;
+  n: number | null;
+}
+
+export interface RegimeFactorIc {
+  factors: Record<string, RegimeFactorEntry> | null;
+  current_weights_subset: Record<string, number> | null;
+  suggested_weights_subset: Record<string, number> | null;
+  note?: string | null;
+}
+
+export interface ErrorSection {
+  error: string;
+}
+
+export interface Scorecard {
+  fear_greed_extremes: FgExtremes | ErrorSection;
+  sector_rrg_hit_rate: RrgHitRate | ErrorSection;
+  momentum_ic: MomentumIc | ErrorSection;
+  regime_factor_ic: RegimeFactorIc | ErrorSection;
+  limitations: string | null;
+  index_sample_n: number | null;
+}
+
+export interface VerificationResponse {
+  tier: "verification";
+  market: "KOSPI" | "NASDAQ";
+  scorecard: Scorecard;
+}

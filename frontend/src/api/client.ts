@@ -1,4 +1,4 @@
-import type { HistoryResponse, MarketPayload, SectorsResponse, StocksResponse } from "./types";
+import type { HistoryResponse, MarketPayload, SectorsResponse, StocksResponse, VerificationResponse } from "./types";
 
 export type Market = "KOSPI" | "NASDAQ";
 
@@ -31,6 +31,15 @@ export async function fetchStocks(market: Market, tf: Timeframe = "1D"): Promise
 export async function fetchHistory(market: Market, tf: Timeframe = "1D"): Promise<HistoryResponse> {
   const res = await fetch(`/api/history/${market}?tf=${tf}`);
   if (!res.ok) throw new Error(`API ${res.status} for history ${market}`);
+  return res.json();
+}
+
+// Verification tier (Phase F) — GET /api/verification/{market}. Full-history
+// scorecard, no tf param (the backend computes it once over backfilled history;
+// it is not bucketed per-timeframe like the other tiers).
+export async function fetchVerification(market: Market): Promise<VerificationResponse> {
+  const res = await fetch(`/api/verification/${market}`);
+  if (!res.ok) throw new Error(`API ${res.status} for verification ${market}`);
   return res.json();
 }
 

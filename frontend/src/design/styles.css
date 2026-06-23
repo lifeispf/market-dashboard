@@ -344,6 +344,51 @@
 .mc-bar-fill{height:100%;background:var(--brass-soft);border-radius:2px}
 .mc-narr{font-size:11px;line-height:1.45;color:var(--text-dim)}
 
+/* ---- VerificationPanel (Phase F) — 신호 신뢰도 scorecard ---- */
+.vp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:16px}
+.vp-card{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.vp-card-head{display:flex;flex-direction:column;gap:3px}
+.vp-card-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brass)}
+.vp-card-hint{font-size:11px;color:var(--text-faint);line-height:1.4}
+.vp-card-desc{font-size:11.5px;color:var(--text-dim);line-height:1.5;border-top:1px solid var(--line-soft);padding-top:8px}
+.vp-empty{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);padding:4px 0}
+.vp-error-note{font-family:var(--mono);font-size:11.5px;color:var(--text-faint);font-style:italic}
+.vp-n{font-family:var(--mono);font-size:10px;color:var(--text-faint);white-space:nowrap}
+
+.vp-open{color:var(--open)}
+.vp-tight{color:var(--tight)}
+.vp-neutral{color:var(--neutral)}
+.vp-open-text{color:var(--open)}
+.vp-tight-text{color:var(--tight)}
+
+.vp-fg-grid{display:flex;flex-direction:column;gap:10px}
+.vp-fg-horizon{display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--line-soft);border-radius:6px;padding:9px 11px}
+.vp-fg-horizon-label{font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:.04em}
+.vp-fg-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:11.5px}
+.vp-fg-side-label{font-family:var(--mono);font-size:10.5px;font-weight:600;min-width:74px}
+.vp-fg-stat{color:var(--text-dim);flex:1}
+
+.vp-rrg-grid{display:flex;flex-direction:column;gap:8px}
+.vp-rrg-row{display:flex;align-items:baseline;gap:10px;font-size:12px}
+.vp-rrg-label{color:var(--text-dim);flex:1}
+.vp-rrg-val{font-family:var(--mono);font-weight:600;font-size:13px}
+
+.vp-ic-row{display:flex;align-items:baseline;gap:10px}
+.vp-ic-val{font-family:var(--mono);font-weight:600;font-size:15px}
+
+.vp-factor-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.vp-factor-table th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint);padding:0 6px 6px 0;border-bottom:1px solid var(--line-soft)}
+.vp-factor-table td{padding:5px 6px 5px 0;border-bottom:1px solid var(--line-soft)}
+.vp-factor-table tr:last-child td{border-bottom:none}
+.vp-factor-id{font-family:var(--mono);color:var(--text);font-weight:500}
+.vp-factor-n{font-family:var(--mono);color:var(--text-dim)}
+
+.vp-footnote{background:var(--panel);border:1px solid var(--line-soft);border-radius:7px;padding:11px 14px}
+.vp-footnote-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.vp-footnote-head span:first-child{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--brass-soft)}
+.vp-footnote-n{font-family:var(--mono);font-size:10.5px;color:var(--text-faint)}
+.vp-footnote-text{font-size:11.5px;color:var(--text-faint);line-height:1.5}
+
 @media (max-width:1100px){
   /* below ~1100px .ld-wrap (max-width:1080px) has no side margin left, so the
      fixed rail would sit on top of content edges — shrink + hug the corner
@@ -358,4 +403,5 @@
   .ld-grid3{grid-template-columns:1fr}
   .vc-grid{grid-template-columns:1fr}
   .sv-columns{grid-template-columns:1fr}
+  .vp-grid{grid-template-columns:1fr}
 }
