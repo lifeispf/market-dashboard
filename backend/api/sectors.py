@@ -14,7 +14,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from engine.core.timeframes import normalize_tf
+from engine.sector.concentration import compute_concentration
 from engine.sector.engine import run_sectors
+from engine.sector.inputs import gather_sector_inputs
 
 router = APIRouter()
 
@@ -31,8 +33,16 @@ def get_sectors(market: str, tf: str = "1D"):
         outputs = run_sectors(market, tf=tf)
     except Exception as exc:  # never 500 — graceful degradation(§9.3)
         raise HTTPException(status_code=503, detail=f"sector assembly failed: {exc}")
+    try:
+        # D-⑤ 집중도/리더십 협소도(비동결 envelope 가산). gather_sector_inputs는
+        # DB read-through 캐시이므로 run_sectors와 같은 날 재호출해도 가볍다.
+        rows = gather_sector_inputs(market, tf=tf)
+        concentration = compute_concentration(rows)
+    except Exception:  # never 500 — concentration is additive, must not break sectors
+        concentration = compute_concentration([])
     return {
         "tier": "sector",
         "market": market,
         "sectors": [eo.to_dict() for eo in outputs],
+        "concentration": concentration,
     }
