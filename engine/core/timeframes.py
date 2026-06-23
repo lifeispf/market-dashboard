@@ -86,4 +86,24 @@ def lookback_days_for(tf: str) -> int:
 
 # Phase E (§21 D-12): 멀티 윈도우 RRG 표준 lookback(거래일, ≈ 캘린더 1M/3M/6M/12M).
 # `tf` 셀렉터와 무관하게 항상 이 4개 윈도우를 동시 관찰한다(블루프린트 §21).
+# 하위호환/기본값(rrg_windows_for가 알 수 없는 tf를 받았을 때의 fallback)으로 유지한다.
 RRG_WINDOWS: dict[str, int] = {"1M": 21, "3M": 63, "6M": 126, "12M": 252}
+
+
+# Phase F: 멀티-윈도우 RRG의 4개 호라이즌이 tf와 함께 스케일하도록 tf별 윈도우 셋.
+# 짧은 tf(1D/1W)는 짧은 호라이즌(1M~18M), 긴 tf(1Q/1Y)는 긴 호라이즌(12M~60M)을 본다.
+RRG_WINDOWS_BY_TF: dict[str, dict[str, int]] = {
+    "1D": {"1M": 21, "3M": 63, "6M": 126, "12M": 252},
+    "1W": {"3M": 63, "6M": 126, "12M": 252, "18M": 378},
+    "1M": {"6M": 126, "12M": 252, "18M": 378, "24M": 504},
+    "1Q": {"12M": 252, "18M": 378, "24M": 504, "36M": 756},
+    "1Y": {"12M": 252, "24M": 504, "36M": 756, "60M": 1260},
+}
+
+
+def rrg_windows_for(tf: str) -> dict[str, int]:
+    """tf에 대응하는 멀티-윈도우 RRG 윈도우 셋(라벨→거래일)을 반환한다.
+
+    알 수 없는 tf는 normalize_tf를 통해 "1D"로 방어적으로 떨어진다(기존
+    RRG_WINDOWS_BY_TF["1D"] == 기존 RRG_WINDOWS와 동일한 값)."""
+    return RRG_WINDOWS_BY_TF.get(normalize_tf(tf), RRG_WINDOWS_BY_TF["1D"])

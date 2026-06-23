@@ -1,9 +1,10 @@
-"""engine/tests/test_multi_window_rrg.py — Phase E 멀티 윈도우 RRG 단위테스트.
+"""engine/tests/test_multi_window_rrg.py — Phase E/F 멀티 윈도우 RRG 단위테스트.
 
 stdlib unittest. 합성 pandas Series만 사용(DB/네트워크 fetch 없음) — 데이터 무관.
-`engine.sector.inputs.compute_multi_window_rrg`가 RRG_WINDOWS(1M/3M/6M/12M)
-각각에 scoring.compute_rs_ratio_momentum/rrg_quadrant를 그대로 호출하고, 합의
-(consensus)를 올바르게 산출/degrade하는지 검증한다.
+`engine.sector.inputs.compute_multi_window_rrg`가 호출부가 넘긴 `windows` 딕셔너리
+(라벨→거래일) 각각에 scoring.compute_rs_ratio_momentum/rrg_quadrant를 그대로 호출하고,
+합의(consensus)를 올바르게 산출/degrade하는지 검증한다. Phase F: 윈도우 셋 자체가
+tf에 따라 스케일하는 `engine.core.timeframes.rrg_windows_for`도 함께 검증한다.
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from engine.core.timeframes import RRG_WINDOWS
+from engine.core.timeframes import RRG_WINDOWS, rrg_windows_for
 from engine.sector.inputs import compute_multi_window_rrg
 
 
@@ -35,12 +36,12 @@ class MultiWindowRrgSufficientDataTests(unittest.TestCase):
         self.benchmark = _series(700, start=100.0, drift=0.0, seed=2)
 
     def test_returns_all_four_window_labels(self):
-        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark)
+        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark, RRG_WINDOWS)
         self.assertEqual(set(by_window.keys()), set(RRG_WINDOWS.keys()))
         self.assertEqual(set(by_window.keys()), {"1M", "3M", "6M", "12M"})
 
     def test_each_resolved_window_has_ratio_momentum_quadrant(self):
-        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark)
+        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark, RRG_WINDOWS)
         for label, entry in by_window.items():
             if entry is None:
                 continue
@@ -50,7 +51,7 @@ class MultiWindowRrgSufficientDataTests(unittest.TestCase):
             self.assertIn(entry["quadrant"], {"leading", "improving", "weakening", "lagging"})
 
     def test_consensus_present_when_windows_resolve(self):
-        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark)
+        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark, RRG_WINDOWS)
         n_resolved = sum(1 for v in by_window.values() if v is not None)
         self.assertGreater(n_resolved, 0)
         self.assertIsNotNone(consensus)
@@ -62,7 +63,7 @@ class MultiWindowRrgSufficientDataTests(unittest.TestCase):
         self.assertLessEqual(consensus["agreement"], 1.0)
 
     def test_consensus_quadrant_is_one_of_resolved_quadrants(self):
-        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark)
+        by_window, consensus = compute_multi_window_rrg(self.sector, self.benchmark, RRG_WINDOWS)
         resolved = {v["quadrant"] for v in by_window.values() if v is not None}
         self.assertIn(consensus["quadrant"], resolved)
 
@@ -71,14 +72,14 @@ class MultiWindowRrgInsufficientDataTests(unittest.TestCase):
     """None / 너무 짧은 series -> 모든 윈도우 None, consensus None (never raises)."""
 
     def test_none_series_yields_all_none_windows_and_none_consensus(self):
-        by_window, consensus = compute_multi_window_rrg(None, None)
+        by_window, consensus = compute_multi_window_rrg(None, None, RRG_WINDOWS)
         self.assertEqual(set(by_window.keys()), {"1M", "3M", "6M", "12M"})
         self.assertTrue(all(v is None for v in by_window.values()))
         self.assertIsNone(consensus)
 
     def test_one_sided_none_yields_all_none(self):
         sector = _series(700, seed=3)
-        by_window, consensus = compute_multi_window_rrg(sector, None)
+        by_window, consensus = compute_multi_window_rrg(sector, None, RRG_WINDOWS)
         self.assertTrue(all(v is None for v in by_window.values()))
         self.assertIsNone(consensus)
 
@@ -88,7 +89,7 @@ class MultiWindowRrgInsufficientDataTests(unittest.TestCase):
         n = 50
         sector = _series(n, drift=0.2, seed=4)
         benchmark = _series(n, drift=0.0, seed=5)
-        by_window, consensus = compute_multi_window_rrg(sector, benchmark)
+        by_window, consensus = compute_multi_window_rrg(sector, benchmark, RRG_WINDOWS)
         self.assertIsNone(by_window["12M"])
         self.assertIsNone(by_window["6M"])
         self.assertIsNone(by_window["3M"])
@@ -102,7 +103,7 @@ class MultiWindowRrgInsufficientDataTests(unittest.TestCase):
     def test_very_short_series_all_windows_none(self):
         sector = _series(5, seed=6)
         benchmark = _series(5, seed=7)
-        by_window, consensus = compute_multi_window_rrg(sector, benchmark)
+        by_window, consensus = compute_multi_window_rrg(sector, benchmark, RRG_WINDOWS)
         self.assertTrue(all(v is None for v in by_window.values()))
         self.assertIsNone(consensus)
 
@@ -110,7 +111,7 @@ class MultiWindowRrgInsufficientDataTests(unittest.TestCase):
         # disjoint date ranges -> inner join produces empty/too-short aligned series.
         sector = pd.Series([1.0, 2.0, 3.0], index=pd.bdate_range("2020-01-01", periods=3))
         benchmark = pd.Series([1.0, 2.0, 3.0], index=pd.bdate_range("2021-01-01", periods=3))
-        by_window, consensus = compute_multi_window_rrg(sector, benchmark)
+        by_window, consensus = compute_multi_window_rrg(sector, benchmark, RRG_WINDOWS)
         self.assertTrue(all(v is None for v in by_window.values()))
         self.assertIsNone(consensus)
 
@@ -129,7 +130,7 @@ class MultiWindowRrgConsensusModalLogicTests(unittest.TestCase):
         # every resolved window toward the same (non-lagging) quadrant, giving full agreement.
         sector = _series(700, start=100.0, drift=0.3, seed=10)
         benchmark = _series(700, start=100.0, drift=-0.05, seed=11)
-        by_window, consensus = compute_multi_window_rrg(sector, benchmark)
+        by_window, consensus = compute_multi_window_rrg(sector, benchmark, RRG_WINDOWS)
         resolved = [v["quadrant"] for v in by_window.values() if v is not None]
         self.assertGreater(len(resolved), 0)
         # consensus quadrant must be the actual modal value among resolved windows
@@ -138,6 +139,62 @@ class MultiWindowRrgConsensusModalLogicTests(unittest.TestCase):
         max_count = max(counts.values())
         self.assertEqual(counts[consensus["quadrant"]], max_count)
         self.assertAlmostEqual(consensus["agreement"], max_count / len(resolved))
+
+
+class RrgWindowsForTfTests(unittest.TestCase):
+    """Phase F: rrg_windows_for(tf)가 tf에 따라 다른 윈도우 셋을 반환하는지 검증."""
+
+    def test_1d_matches_legacy_rrg_windows(self):
+        self.assertEqual(rrg_windows_for("1D"), RRG_WINDOWS)
+        self.assertEqual(rrg_windows_for("1D"), {"1M": 21, "3M": 63, "6M": 126, "12M": 252})
+
+    def test_1w_differs_from_1d(self):
+        windows_1d = rrg_windows_for("1D")
+        windows_1w = rrg_windows_for("1W")
+        self.assertNotEqual(windows_1d, windows_1w)
+        self.assertEqual(set(windows_1w.keys()), {"3M", "6M", "12M", "18M"})
+        self.assertEqual(windows_1w, {"3M": 63, "6M": 126, "12M": 252, "18M": 378})
+
+    def test_unknown_tf_falls_back_to_1d(self):
+        self.assertEqual(rrg_windows_for("not-a-tf"), rrg_windows_for("1D"))
+        self.assertEqual(rrg_windows_for(None), rrg_windows_for("1D"))
+
+    def test_longer_tf_has_longer_windows_than_shorter_tf(self):
+        # The longest window for each successive tf should be >= the previous tf's longest.
+        order = ["1D", "1W", "1M", "1Q", "1Y"]
+        longest = [max(rrg_windows_for(tf).values()) for tf in order]
+        self.assertEqual(longest, sorted(longest))
+        self.assertEqual(longest[0], 252)
+        self.assertEqual(longest[-1], 1260)
+
+
+class ComputeMultiWindowRrgCustomWindowsTests(unittest.TestCase):
+    """compute_multi_window_rrg가 호출부가 넘긴 임의의 `windows` 라벨로 응답하는지 검증."""
+
+    def test_returns_entries_keyed_by_passed_window_labels(self):
+        sector = _series(700, start=100.0, drift=0.15, seed=20)
+        benchmark = _series(700, start=100.0, drift=0.0, seed=21)
+        custom_windows = {"6M": 126, "12M": 252, "18M": 378, "24M": 504}
+        by_window, consensus = compute_multi_window_rrg(sector, benchmark, custom_windows)
+        self.assertEqual(set(by_window.keys()), set(custom_windows.keys()))
+        self.assertNotIn("1M", by_window)
+        self.assertNotIn("3M", by_window)
+        for label, entry in by_window.items():
+            if entry is None:
+                continue
+            self.assertIn(entry["quadrant"], {"leading", "improving", "weakening", "lagging"})
+
+    def test_window_exceeding_history_degrades_to_none(self):
+        # 700 daily bars is not enough for a 1260-bar (60M) window to ever resolve
+        # (needs 1260+1260+1=2521 overlapping bars) -> must degrade to None, not raise.
+        sector = _series(700, start=100.0, drift=0.1, seed=22)
+        benchmark = _series(700, start=100.0, drift=0.0, seed=23)
+        custom_windows = {"12M": 252, "24M": 504, "36M": 756, "60M": 1260}
+        by_window, consensus = compute_multi_window_rrg(sector, benchmark, custom_windows)
+        self.assertIsNone(by_window["60M"])
+        self.assertIsNone(by_window["36M"])
+        # shorter windows should still resolve given 700 bars of consistent drift.
+        self.assertIsNotNone(by_window["12M"])
 
 
 if __name__ == "__main__":

@@ -21,11 +21,11 @@ from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import leadership_fetcher
 from engine.core.timeframes import (
-    RRG_WINDOWS,
     lookback_days_for,
     normalize_tf,
     resample_for_tf,
     rrg_window_for,
+    rrg_windows_for,
 )
 
 from backend.api._assembly_helpers import (
@@ -51,15 +51,20 @@ class SectorRow:
     rs_ratio: float | None
     rs_momentum: float | None
     quadrant: str | None
-    # Phase E (§21 D-12): 1M/3M/6M/12M 동시관찰 RRG — ADDITIVE, tf와 무관하게
-    # 항상 4개 표준 윈도우로 계산. sector_rows_to_payload()에는 포함하지 않는다
-    # (동결 7필드 payload byte-identical 보존).
+    # Phase E (§21 D-12) / Phase F: 멀티-윈도우(4개) 동시관찰 RRG — ADDITIVE.
+    # Phase F부터 윈도우 라벨/길이는 tf에 따라 스케일한다(rrg_windows_for(tf) —
+    # 1D=1M/3M/6M/12M, 1W=3M/6M/12M/18M, ... 1Y=12M/24M/36M/60M).
+    # sector_rows_to_payload()에는 포함하지 않는다(동결 7필드 payload byte-identical 보존).
     rrg_by_window: dict[str, dict[str, Any] | None] | None = None
     rrg_consensus: dict[str, Any] | None = None
 
 
-def compute_multi_window_rrg(sector_series, benchmark_series) -> tuple[dict[str, dict[str, Any] | None], dict[str, Any] | None]:
-    """1M/3M/6M/12M(RRG_WINDOWS) 동시관찰 RRG — §21 D-12.
+def compute_multi_window_rrg(sector_series, benchmark_series, windows: dict[str, int]) -> tuple[dict[str, dict[str, Any] | None], dict[str, Any] | None]:
+    """`windows`(라벨→거래일)로 지정된 호라이즌들의 동시관찰 RRG — §21 D-12 / Phase F.
+
+    Phase F부터 윈도우 셋은 호출부가 넘긴다(tf-scaled — engine.core.timeframes.
+    rrg_windows_for). 호환을 위해 기본 4-윈도우 동작은 호출부가 RRG_WINDOWS(또는
+    rrg_windows_for("1D"))를 넘기면 그대로 재현된다.
 
     각 (label, W)에 대해 scoring.compute_rs_ratio_momentum(ratio_window=W,
     momentum_window=W)을 그대로 호출한다(공식 단일 출처 보존). 데이터가 모자라면
@@ -70,12 +75,12 @@ def compute_multi_window_rrg(sector_series, benchmark_series) -> tuple[dict[str,
     하나도 해석 가능한 윈도우가 없으면 consensus=None.
 
     Returns:
-        (rrg_by_window, consensus) — rrg_by_window는 RRG_WINDOWS의 모든 라벨을
+        (rrg_by_window, consensus) — rrg_by_window는 `windows`의 모든 라벨을
         키로 갖는다(값은 dict 또는 None). consensus는
         {"quadrant", "agreement", "n"} 또는 None.
     """
     by_window: dict[str, dict[str, Any] | None] = {}
-    for label, window in RRG_WINDOWS.items():
+    for label, window in windows.items():
         if sector_series is None or benchmark_series is None:
             by_window[label] = None
             continue
@@ -91,7 +96,7 @@ def compute_multi_window_rrg(sector_series, benchmark_series) -> tuple[dict[str,
 
     # Longer windows should win quadrant ties -> iterate from longest to shortest so
     # the first-seen max count in a tie belongs to the longest window.
-    ordered_labels = sorted(RRG_WINDOWS, key=lambda lbl: RRG_WINDOWS[lbl], reverse=True)
+    ordered_labels = sorted(windows, key=lambda lbl: windows[lbl], reverse=True)
     resolved_quadrants = [by_window[lbl]["quadrant"] for lbl in ordered_labels if by_window[lbl] is not None]
     n = len(resolved_quadrants)
     if n == 0:
@@ -141,11 +146,17 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
     benchmark_ytd = _ytd_slice(benchmark_series)
     benchmark_for_rrg = benchmark_ytd if tf == "1D" else benchmark_series
 
-    # Phase E (§21 D-12): multi-window RRG is independent of `tf` — always read the
-    # deep daily FULL benchmark series (12M window needs ~505 daily bars; lookback_days_for
-    # ("1D") only fetches 400 days, so re-read with the deepest standard lookback regardless
-    # of the caller's tf). _cached_series is a same-day DB read-through cache, so this is a
-    # cheap re-read (no extra network fetch) when lookback_days already covers this range.
+    # Phase E (§21 D-12) / Phase F: the multi-window RRG's underlying series read is
+    # independent of `tf` — always read the deepest daily FULL benchmark series
+    # (lookback_days_for("1Y")) regardless of the caller's tf, so that even the longest
+    # tf-scaled window (e.g. 60M=1260 trading days for tf="1Y") has a chance to resolve;
+    # windows.py's compute_multi_window_rrg degrades any window exceeding available history
+    # to None gracefully (scoring.compute_rs_ratio_momentum's own bar-count guard). Only the
+    # *window labels/lengths themselves* scale with tf via rrg_windows_for(tf) below.
+    # lookback_days_for("1D") only fetches 400 calendar days, which is too shallow even for
+    # the original fixed 12M(252) window, so we re-read with the deepest standard lookback.
+    # _cached_series is a same-day DB read-through cache, so this is a cheap re-read (no
+    # extra network fetch) when lookback_days already covers this range.
     deep_lookback_days = lookback_days_for("1Y")
     benchmark_deep_full = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=deep_lookback_days)
     for code, sdef in sector_defs.items():
@@ -198,7 +209,9 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
         )
         quadrant = scoring.rrg_quadrant(rs_r, rs_m)
 
-        rrg_by_window, rrg_consensus = compute_multi_window_rrg(sector_deep_full, benchmark_deep_full)
+        rrg_by_window, rrg_consensus = compute_multi_window_rrg(
+            sector_deep_full, benchmark_deep_full, rrg_windows_for(tf),
+        )
 
         sector_rows.append(
             SectorRow(
