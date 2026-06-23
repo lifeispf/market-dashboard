@@ -131,10 +131,24 @@ export interface EngineOutput {
   mode: EngineMode;
 }
 
+// D-⑤ — concentration / leadership-breadth block (NOT frozen, additive to
+// /api/sectors envelope). Mirrors engine/sector/concentration.py compute_concentration().
+// Any field may be null/empty when market caps are missing — never assume presence.
+export interface Concentration {
+  hhi: number | null;
+  effective_n: number | null;
+  top1_cap_pct: number | null;
+  top3_cap_pct: number | null;
+  top1_ytd_contribution_pct: number | null;
+  top3_ytd_contribution_pct: number | null;
+  leaders: string[];
+}
+
 export interface SectorsResponse {
   tier: "sector";
   market: "KOSPI" | "NASDAQ";
   sectors: EngineOutput[];
+  concentration?: Concentration;
 }
 
 export interface StocksResponse {

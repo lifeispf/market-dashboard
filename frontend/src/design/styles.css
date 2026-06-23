@@ -84,6 +84,9 @@
 .supline-label{position:absolute;left:0;top:5px;font-family:var(--mono);font-size:10px;color:var(--brass);background:var(--ink);padding:1px 6px;border-radius:3px}
 .ld-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;text-align:center;padding:0 30px;line-height:1.7}
 
+/* D-② EPS-proxy caveat (shown whenever ceiling bands render) */
+.ld-eps-caveat{margin-top:8px;font-family:var(--mono);font-size:9.5px;color:var(--text-faint);letter-spacing:.02em;text-align:right}
+
 /* gauge */
 .ld-gaugebox{display:flex;flex-direction:column;gap:14px;height:100%;justify-content:center}
 .track{height:9px;background:#0a1316;border:1px solid var(--line-soft);border-radius:5px;overflow:hidden}
@@ -235,6 +238,12 @@
 .ld-fresh-dot{width:7px;height:7px;border-radius:50%}
 .ld-fresh-dot.ok{background:var(--open)} .ld-fresh-dot.bad{background:var(--neutral)}
 
+/* D-⑥ freshness SLA emphasis */
+.ld-fresh-item-stale{border-color:var(--tight);background:rgba(208,107,74,.10)}
+.ld-fresh-stale-badge{font-family:var(--mono);font-size:9px;letter-spacing:.05em;color:var(--tight);border:1px solid var(--tight);border-radius:3px;padding:1px 5px}
+.ld-fresh-sla{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--tight);margin:8px 0 4px}
+.ld-fresh-sla-badge{font-weight:600;background:rgba(208,107,74,.14);border:1px solid var(--tight);border-radius:4px;padding:2px 7px;letter-spacing:.02em}
+
 .ld-footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--text-faint);line-height:1.7}
 
 /* loading / error states */
@@ -244,6 +253,19 @@
 /* ---- Engine Core envelope primitives (§8.2): VerdictCard / ModuleCard ---- */
 .sv-msg{font-family:var(--mono);font-size:12px;color:var(--text-faint);padding:14px 0}
 .vc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+
+/* ---- D-⑤ concentration / leadership-breadth summary panel ---- */
+.sv-conc-panel{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;margin-bottom:18px}
+.sv-conc-head{margin-bottom:10px}
+.sv-conc-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass)}
+.sv-conc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.sv-conc-kpi{display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid var(--line-soft);border-radius:6px;padding:9px 12px}
+.sv-conc-kpi-l{font-family:var(--mono);font-size:10px;color:var(--text-faint)}
+.sv-conc-kpi-v{font-family:var(--disp);font-size:17px;font-weight:600;color:var(--text)}
+.sv-conc-leaders{display:flex;align-items:baseline;gap:8px;margin-top:10px;font-size:12.5px;color:var(--text-dim)}
+.sv-conc-leaders-l{font-family:var(--mono);font-size:10px;color:var(--text-faint)}
+.sv-conc-leaders-v{color:var(--text)}
+.sv-conc-note{margin-top:8px;font-size:12px;color:var(--text-faint);border-top:1px solid var(--line-soft);padding-top:8px}
 
 /* ---- SectorView 3-column risk-profile layout (공격/중립/방어) ---- */
 .sv-columns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}

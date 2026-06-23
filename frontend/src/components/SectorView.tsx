@@ -6,7 +6,7 @@
 // top of the existing RRG metrics shown in LeadershipSection.
 import { useEffect, useState } from "react";
 import { fetchSectors, type Market, type Timeframe } from "../api/client";
-import type { EngineOutput } from "../api/types";
+import type { Concentration, EngineOutput } from "../api/types";
 import VerdictCard from "../primitives/VerdictCard";
 import { RISK_PROFILE_KR, RISK_PROFILE_ORDER, riskProfileColumn, sectorMomentumScore, type RiskProfile } from "../lib/helpers";
 
@@ -39,18 +39,78 @@ function groupByRiskProfile(sectors: EngineOutput[]): Record<RiskProfile, Engine
   return groups;
 }
 
+// Unsigned 0..100 percentage formatter for share-of-total metrics (cap weight,
+// YTD contribution share) — distinct from helpers.fmtPct, which signs its output
+// (+/-) for return-type metrics and would misleadingly prefix "+" here.
+function fmtSharePct(n: number | null | undefined, digits = 1): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return "N/A";
+  return `${n.toFixed(digits)}%`;
+}
+
+// D-⑤ interpretation: high HHI + low effective_n + high top1 contribution ->
+// narrow leadership ("쏠림 위험"). Thresholds are coarse, display-only heuristics
+// (not a scoring/verdict signal) — purely to help the reader contextualize the numbers.
+function concentrationInterpretation(c: Concentration): string | null {
+  const { hhi, effective_n, top1_ytd_contribution_pct } = c;
+  if (hhi === null && effective_n === null && top1_ytd_contribution_pct === null) return null;
+  const narrow =
+    (hhi !== null && hhi >= 0.25) ||
+    (effective_n !== null && effective_n <= 4) ||
+    (top1_ytd_contribution_pct !== null && top1_ytd_contribution_pct >= 50);
+  return narrow
+    ? "쏠림 위험 — 소수 섹터가 지수를 견인 중 (좁은 리더십)"
+    : "분산 양호 — 다수 섹터가 균형있게 기여";
+}
+
+function ConcentrationPanel({ data }: { data: Concentration }) {
+  const interpretation = concentrationInterpretation(data);
+  return (
+    <div className="sv-conc-panel">
+      <div className="sv-conc-head">
+        <span className="sv-conc-title">집중도 / 리더십 폭</span>
+      </div>
+      <div className="sv-conc-kpis">
+        <div className="sv-conc-kpi">
+          <span className="sv-conc-kpi-l">HHI</span>
+          <span className="sv-conc-kpi-v">{data.hhi === null ? "N/A" : data.hhi.toFixed(3)}</span>
+        </div>
+        <div className="sv-conc-kpi">
+          <span className="sv-conc-kpi-l">유효섹터수</span>
+          <span className="sv-conc-kpi-v">{data.effective_n === null ? "N/A" : data.effective_n.toFixed(1)}</span>
+        </div>
+        <div className="sv-conc-kpi">
+          <span className="sv-conc-kpi-l">상위1 시총비중</span>
+          <span className="sv-conc-kpi-v">{fmtSharePct(data.top1_cap_pct)}</span>
+        </div>
+        <div className="sv-conc-kpi">
+          <span className="sv-conc-kpi-l">상위1 YTD기여</span>
+          <span className="sv-conc-kpi-v">{fmtSharePct(data.top1_ytd_contribution_pct)}</span>
+        </div>
+      </div>
+      <div className="sv-conc-leaders">
+        <span className="sv-conc-leaders-l">리더 섹터</span>
+        <span className="sv-conc-leaders-v">{data.leaders.length > 0 ? data.leaders.join(", ") : "N/A"}</span>
+      </div>
+      {interpretation && <div className="sv-conc-note">{interpretation}</div>}
+    </div>
+  );
+}
+
 export default function SectorView({ market, tf, nameByCode }: SectorViewProps) {
   const [sectors, setSectors] = useState<EngineOutput[] | null>(null);
+  const [concentration, setConcentration] = useState<Concentration | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setSectors(null);
+    setConcentration(null);
     setError(null);
     fetchSectors(market, tf)
       .then((res) => {
         if (cancelled) return;
         setSectors(res.sectors);
+        setConcentration(res.concentration ?? null);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -76,6 +136,7 @@ export default function SectorView({ market, tf, nameByCode }: SectorViewProps) 
 
       {error && <div className="sv-msg" style={{ color: "var(--tight)" }}>⚠ 섹터 API 실패: {error}</div>}
       {!error && sectors === null && <div className="sv-msg">섹터 판정 불러오는 중…</div>}
+      {!error && concentration && <ConcentrationPanel data={concentration} />}
 
       {columns && (
         <div className="sv-columns">
