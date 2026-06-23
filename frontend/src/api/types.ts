@@ -151,6 +151,24 @@ export interface SectorsResponse {
   concentration?: Concentration;
 }
 
+// Phase E (§21 D-12) — multi-window RRG, additive via verdict.extra on the sector
+// tier envelope. rrg_by_window has one entry per standard window (1M/3M/6M/12M);
+// any entry may be null when that window's RS calc lacks enough history.
+// rrg_consensus is the modal quadrant across resolved windows (longer windows win
+// ties) or null when zero windows resolve. Mirrors engine/sector/inputs.py
+// compute_multi_window_rrg() exactly: {ratio, momentum, quadrant} / {quadrant, agreement, n}.
+export interface RrgWindowEntry {
+  ratio: number | null;
+  momentum: number | null;
+  quadrant: Quadrant | null;
+}
+
+export interface RrgConsensus {
+  quadrant: Quadrant | null;
+  agreement: number | null;
+  n: number | null;
+}
+
 export interface StocksResponse {
   tier: "stock";
   market: "KOSPI" | "NASDAQ";

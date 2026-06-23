@@ -20,14 +20,17 @@ interface RRGChartProps {
   // draw a faint "where this dot has been" path for the selected point. Additive —
   // absent/empty trail just means no polyline is drawn (no crash).
   trails?: Record<string, TrailPoint[]>;
+  // Phase E: shrink the box/labels for small-multiples (4-window grid). Additive —
+  // omitted/false keeps the existing single-window appearance byte-identical.
+  compact?: boolean;
 }
 
-export default function RRGChart({ points, selectedKey = null, onSelect, trails }: RRGChartProps) {
+export default function RRGChart({ points, selectedKey = null, onSelect, trails, compact = false }: RRGChartProps) {
   const plottable = points.filter((s) => s.rsRatio !== null && s.rsMomentum !== null);
 
   if (plottable.length === 0) {
     return (
-      <div className="rrgbox">
+      <div className={`rrgbox ${compact ? "rrgbox-compact" : ""}`}>
         <div className="rrgplot">
           <div className="ld-empty">RRG 데이터 없음 (rsRatio/rsMomentum 미가용)</div>
         </div>
@@ -58,7 +61,7 @@ export default function RRGChart({ points, selectedKey = null, onSelect, trails 
   const hasTrail = trailPoints.length >= 2;
 
   return (
-    <div className="rrgbox">
+    <div className={`rrgbox ${compact ? "rrgbox-compact" : ""}`}>
       <div className="rrgplot">
         <div className="rrg-quad" style={{ position: "absolute", left: xZero + "%", top: 0, right: 0, height: yZero + "%" }}>
           <span style={{ top: 0, right: 0 }}>LEADING</span>

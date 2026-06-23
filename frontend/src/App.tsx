@@ -95,11 +95,14 @@ function App() {
         {payload._mode})
       </div>
       <GlobalMacroBar sources={payload.sources} />
+      {/* Mounted as a direct child of .ld-root (not inside .ld-wrap) — its rail is
+          position:fixed and .ld-wrap is just a centered max-width column with no
+          transform/overflow ancestor that would break fixed positioning, but keeping
+          it top-level avoids any future risk of that and keeps it out of the
+          centered-column DOM subtree entirely. */}
+      <TimeframeSelector tf={tf} setTf={setTf} />
       <div className="ld-wrap">
         <Header market={market} setMarket={setMarket} pill={payload.pill} asOf={payload.asOf} />
-        <div className="ld-tf-row">
-          <TimeframeSelector tf={tf} setTf={setTf} />
-        </div>
         <CrossNarrativeBadge narrative={payload.narrative} rec={payload.reconciliation} />
         <FlowSection flow={payload.flow} tf={tf} />
         <LiquiditySection

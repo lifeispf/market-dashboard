@@ -28,7 +28,21 @@
 .ld-tf-toggle button:disabled{opacity:.35;cursor:not-allowed}
 .ld-pill{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:7px;background:#3a2e12;color:var(--brass);letter-spacing:.03em}
 .ld-asof{font-family:var(--mono);font-size:11px;color:var(--text-faint)}
-.ld-tf-row{display:flex;align-items:center;gap:10px;margin:-4px 0 14px}
+
+/* timeframe rail — fixed vertical control floating in the right viewport margin
+   so 일/주/월/분기/년 stays reachable while the page scrolls (Phase D). */
+.ld-tf-rail{
+  position:fixed; top:50%; right:12px; transform:translateY(-50%); z-index:40;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  background:var(--panel); border:1px solid var(--line); border-radius:10px;
+  padding:10px 6px; box-shadow:0 4px 18px rgba(0,0,0,.35);
+}
+.ld-tf-rail-label{
+  font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--brass); writing-mode:vertical-rl; text-orientation:mixed; margin-bottom:2px;
+}
+.ld-tf-toggle-vert{flex-direction:column; gap:4px; background:transparent; border:none; padding:0}
+.ld-tf-toggle-vert button{padding:8px 10px; min-width:40px; text-align:center}
 
 /* cross narrative badge */
 .ld-narrative{margin:6px 0 26px;padding:18px 20px;background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:6px;position:relative;overflow:hidden}
@@ -198,6 +212,20 @@
 .ld-rrg-legend span{display:inline-flex;align-items:center;gap:5px}
 .ld-rrg-legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
 
+/* compact RRGChart variant for small-multiples (Phase E) — shrinks plot height and
+   dot/label scale so 4 windows fit a 2x2/4-col grid without overflowing. */
+.rrgbox-compact{height:170px}
+.rrgbox-compact .rrg-quad span{font-size:8px;padding:4px}
+.rrgbox-compact .rrg-dot{width:8px;height:8px}
+.rrgbox-compact .rrg-dot-label{font-size:8.5px;left:10px;top:-6px}
+
+/* Phase E — multi-window RRG small-multiples (1M/3M/6M/12M simultaneous view) */
+.ld-mw-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:10px}
+.ld-mw-cell{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:6px;padding:10px 12px 4px}
+.ld-mw-cell-label{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--brass-soft);margin-bottom:4px;text-align:center}
+.ld-mw-consensus{margin-top:14px;font-size:12.5px;color:var(--text-dim);font-family:var(--mono)}
+@media (min-width:880px){.ld-mw-grid{grid-template-columns:repeat(4,1fr)}}
+
 /* leader cards */
 .ld-hint{font-size:11.5px;color:var(--text-faint);margin-bottom:10px}
 .ld-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
@@ -315,6 +343,15 @@
 .mc-bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
 .mc-bar-fill{height:100%;background:var(--brass-soft);border-radius:2px}
 .mc-narr{font-size:11px;line-height:1.45;color:var(--text-dim)}
+
+@media (max-width:1100px){
+  /* below ~1100px .ld-wrap (max-width:1080px) has no side margin left, so the
+     fixed rail would sit on top of content edges — shrink + hug the corner
+     instead of overlapping the page body. */
+  .ld-tf-rail{top:auto; bottom:16px; right:8px; transform:none; padding:8px 4px}
+  .ld-tf-rail-label{font-size:9px}
+  .ld-tf-toggle-vert button{padding:6px 8px; min-width:34px; font-size:11px}
+}
 
 @media (max-width:760px){
   .ld-grid2{grid-template-columns:1fr}

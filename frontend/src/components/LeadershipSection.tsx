@@ -15,8 +15,22 @@ import { useEffect, useState } from "react";
 import RRGChart from "./RRGChart";
 import { AlertTriangle } from "./icons";
 import { quadKr } from "../lib/helpers";
-import { fetchStocks, type Market, type Timeframe } from "../api/client";
-import type { EngineOutput, HistoryResponse, RRGPoint, Sector, SectorLeaders, TrailPoint } from "../api/types";
+import { fetchSectors, fetchStocks, type Market, type Timeframe } from "../api/client";
+import type {
+  EngineOutput,
+  HistoryResponse,
+  RRGPoint,
+  RrgConsensus,
+  RrgWindowEntry,
+  Sector,
+  SectorLeaders,
+  TrailPoint,
+} from "../api/types";
+
+// Phase E: the 4 standard multi-window RRG horizons, in display order. Mirrors
+// engine/sector/inputs.py RRG_WINDOWS labels exactly.
+const RRG_WINDOWS = ["1M", "3M", "6M", "12M"] as const;
+type RrgWindowLabel = (typeof RRG_WINDOWS)[number];
 
 // Ticker -> display name, joined from the curated `leaders` block (same pattern as
 // StockView.buildNameByTicker — duplicated here rather than imported since StockView
@@ -95,6 +109,38 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
     };
   }, [market, tf]);
 
+  // Phase E: independent /api/sectors fetch (Engine Core envelope) to read the
+  // multi-window RRG fields stamped on verdict.extra (rrg_by_window/rrg_consensus).
+  // The `sectors` prop above is the frozen single-window payload and does not carry
+  // these — same low-risk redundant-GET pattern as the Phase C `stocks` fetch above.
+  const [sectorEnvelopes, setSectorEnvelopes] = useState<EngineOutput[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setSectorEnvelopes(null);
+    fetchSectors(market, tf)
+      .then((res) => {
+        if (cancelled) return;
+        setSectorEnvelopes(res.sectors);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSectorEnvelopes([]); // null-safe degrade — empty list renders empty windows
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [market, tf]);
+
+  // code -> rrg_by_window / code -> rrg_consensus, read from verdict.extra with safe
+  // casts (extra is Record<string, unknown> per the Engine Core envelope contract).
+  const rrgByWindowByCode: Record<string, Record<string, RrgWindowEntry | null> | undefined> = {};
+  const rrgConsensusByCode: Record<string, RrgConsensus | null | undefined> = {};
+  for (const o of sectorEnvelopes ?? []) {
+    const extra = o.verdict?.extra;
+    rrgByWindowByCode[o.entity_id] = extra?.rrg_by_window as Record<string, RrgWindowEntry | null> | undefined;
+    rrgConsensusByCode[o.entity_id] = extra?.rrg_consensus as RrgConsensus | null | undefined;
+  }
+
   const nameByTicker = buildNameByTicker(leaders);
 
   if (!sectors.length || !selSector) {
@@ -133,6 +179,30 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
       quadrant: (o.verdict.extra?.sector_quadrant as RRGPoint["quadrant"] | null | undefined) ?? null,
     }));
   const plottableStockPoints = sectorStockPoints.filter((p) => p.rsRatio !== null && p.rsMomentum !== null);
+
+  // Phase E: build one RRGPoint[] per standard window (1M/3M/6M/12M) from the
+  // sector envelopes' rrg_by_window map. Sectors with a null entry for that window
+  // are skipped (RRGChart's own plottable filter would drop them anyway, but we
+  // also need their name/code resolved from the frozen `sectors` list since the
+  // envelope itself does not carry a display name).
+  const multiWindowPoints: Record<RrgWindowLabel, RRGPoint[]> = { "1M": [], "3M": [], "6M": [], "12M": [] };
+  for (const s of sectors) {
+    const byWindow = rrgByWindowByCode[s.code];
+    if (!byWindow) continue;
+    for (const w of RRG_WINDOWS) {
+      const entry = byWindow[w];
+      if (!entry) continue;
+      multiWindowPoints[w].push({
+        code: s.code,
+        name: s.name,
+        rsRatio: entry.ratio ?? null,
+        rsMomentum: entry.momentum ?? null,
+        quadrant: entry.quadrant ?? null,
+      });
+    }
+  }
+
+  const selConsensus = rrgConsensusByCode[sel.code];
 
   return (
     <div className="ld-section">
@@ -245,6 +315,42 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
           ) : (
             <div className="ld-simple">이 섹터는 큐레이션된 주도주 데이터가 없습니다 (leaders 미생략).</div>
           )}
+        </div>
+      </div>
+
+      <div className="ld-card" style={{ marginTop: 18 }}>
+        <div className="ld-card-title">멀티-윈도우 RRG (1M · 3M · 6M · 12M)</div>
+        <div className="ld-hint">
+          같은 섹터를 4개 관측 호라이즌으로 동시에 본 결과 — 짧은 윈도우는 최근 추세 전환, 긴 윈도우는 구조적 위치를 반영합니다.
+        </div>
+        {sectorEnvelopes === null ? (
+          <div className="ld-simple">멀티-윈도우 RRG 불러오는 중…</div>
+        ) : (
+          <div className="ld-mw-grid">
+            {RRG_WINDOWS.map((w) => (
+              <div className="ld-mw-cell" key={w}>
+                <div className="ld-mw-cell-label">{w}</div>
+                <RRGChart
+                  points={multiWindowPoints[w]}
+                  selectedKey={selSector}
+                  onSelect={(k) => {
+                    setSelSector(k);
+                    setSelLeader(null);
+                  }}
+                  compact
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="ld-mw-consensus">
+          {selConsensus === null || selConsensus === undefined
+            ? `${sel.name} 다중호라이즌 합의: 합의 산정 불가`
+            : `${sel.name} 다중호라이즌 합의: ${quadKr(selConsensus.quadrant)} (일치도 ${
+                selConsensus.agreement === null || selConsensus.agreement === undefined
+                  ? "N/A"
+                  : Math.round(selConsensus.agreement * 100)
+              }%)`}
         </div>
       </div>
 
