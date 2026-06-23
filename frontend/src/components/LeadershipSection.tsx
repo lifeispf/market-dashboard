@@ -27,10 +27,23 @@ import type {
   TrailPoint,
 } from "../api/types";
 
-// Phase E: the 4 standard multi-window RRG horizons, in display order. Mirrors
-// engine/sector/inputs.py RRG_WINDOWS labels exactly.
-const RRG_WINDOWS = ["1M", "3M", "6M", "12M"] as const;
-type RrgWindowLabel = (typeof RRG_WINDOWS)[number];
+// Phase E (now tf-scaled): the multi-window RRG horizon labels are no longer a fixed
+// 1M/3M/6M/12M — the backend re-keys rrg_by_window per tf (see engine/sector/inputs.py
+// RRG_WINDOWS_BY_TF). We derive the active labels at runtime from the fetched envelopes
+// instead of hardcoding them, so this component tracks the backend without a redeploy.
+// Static fallback (tf=1D's window set) used only while envelopes haven't resolved yet /
+// none carry a usable rrg_by_window — keeps the grid/title non-empty during first paint.
+const DEFAULT_RRG_WINDOWS = ["1M", "3M", "6M", "12M"];
+
+// TF -> candle-cadence label, mirrors FlowSection.SPARK_LABEL wording (일봉/주봉/월봉/
+// 분기봉/연봉) so the same tf reads identically across sections.
+const TF_CANDLE_LABEL: Record<Timeframe, string> = {
+  "1D": "일봉",
+  "1W": "주봉",
+  "1M": "월봉",
+  "1Q": "분기봉",
+  "1Y": "연봉",
+};
 
 // Ticker -> display name, joined from the curated `leaders` block (same pattern as
 // StockView.buildNameByTicker — duplicated here rather than imported since StockView
@@ -180,16 +193,32 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
     }));
   const plottableStockPoints = sectorStockPoints.filter((p) => p.rsRatio !== null && p.rsMomentum !== null);
 
-  // Phase E: build one RRGPoint[] per standard window (1M/3M/6M/12M) from the
-  // sector envelopes' rrg_by_window map. Sectors with a null entry for that window
-  // are skipped (RRGChart's own plottable filter would drop them anyway, but we
-  // also need their name/code resolved from the frozen `sectors` list since the
-  // envelope itself does not carry a display name).
-  const multiWindowPoints: Record<RrgWindowLabel, RRGPoint[]> = { "1M": [], "3M": [], "6M": [], "12M": [] };
+  // Multi-window labels are now derived AT RUNTIME from the fetched data, not
+  // hardcoded — the backend re-keys rrg_by_window per tf (e.g. tf=1W -> 3M/6M/12M/18M).
+  // Take Object.keys() from the first sector envelope whose rrg_by_window is non-empty,
+  // preserving the backend's own key order (already short->long server-side). Falls back
+  // to DEFAULT_RRG_WINDOWS only while envelopes are still loading / all empty, so the
+  // grid/title never render blank mid-fetch.
+  let rrgWindows: string[] = DEFAULT_RRG_WINDOWS;
+  for (const s of sectors) {
+    const byWindow = rrgByWindowByCode[s.code];
+    if (byWindow && Object.keys(byWindow).length) {
+      rrgWindows = Object.keys(byWindow);
+      break;
+    }
+  }
+
+  // Build one RRGPoint[] per derived window from the sector envelopes' rrg_by_window
+  // map. Sectors with a null entry for that window are skipped (RRGChart's own
+  // plottable filter would drop them anyway, but we also need their name/code resolved
+  // from the frozen `sectors` list since the envelope itself does not carry a display
+  // name).
+  const multiWindowPoints: Record<string, RRGPoint[]> = {};
+  for (const w of rrgWindows) multiWindowPoints[w] = [];
   for (const s of sectors) {
     const byWindow = rrgByWindowByCode[s.code];
     if (!byWindow) continue;
-    for (const w of RRG_WINDOWS) {
+    for (const w of rrgWindows) {
       const entry = byWindow[w];
       if (!entry) continue;
       multiWindowPoints[w].push({
@@ -234,7 +263,7 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
 
       <div className="ld-grid2" style={{ marginTop: 18 }}>
         <div className="ld-card">
-          <div className="ld-card-title">순환매 (RRG) — 상대강도 × 모멘텀</div>
+          <div className="ld-card-title">순환매 (RRG · {TF_CANDLE_LABEL[tf]}) — 상대강도 × 모멘텀</div>
           <RRGChart
             points={sectors}
             selectedKey={selSector}
@@ -319,15 +348,16 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
       </div>
 
       <div className="ld-card" style={{ marginTop: 18 }}>
-        <div className="ld-card-title">멀티-윈도우 RRG (1M · 3M · 6M · 12M)</div>
+        <div className="ld-card-title">멀티-윈도우 RRG ({rrgWindows.join(" · ")})</div>
         <div className="ld-hint">
-          같은 섹터를 4개 관측 호라이즌으로 동시에 본 결과 — 짧은 윈도우는 최근 추세 전환, 긴 윈도우는 구조적 위치를 반영합니다.
+          같은 섹터를 {rrgWindows.length}개 관측 호라이즌으로 동시에 본 결과 — 짧은 윈도우는 최근 추세 전환, 긴 윈도우는 구조적 위치를 반영합니다.
+          호라이즌은 선택한 타임프레임({TF_CANDLE_LABEL[tf]})에 맞춰 자동으로 늘어나거나 줄어듭니다.
         </div>
         {sectorEnvelopes === null ? (
           <div className="ld-simple">멀티-윈도우 RRG 불러오는 중…</div>
         ) : (
           <div className="ld-mw-grid">
-            {RRG_WINDOWS.map((w) => (
+            {rrgWindows.map((w) => (
               <div className="ld-mw-cell" key={w}>
                 <div className="ld-mw-cell-label">{w}</div>
                 <RRGChart
@@ -355,7 +385,9 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
       </div>
 
       <div className="ld-card" style={{ marginTop: 18 }}>
-        <div className="ld-card-title">{sel.name} 내 종목 RRG (vs 섹터)</div>
+        <div className="ld-card-title">
+          {sel.name} 내 종목 RRG (vs 섹터) · {TF_CANDLE_LABEL[tf]}
+        </div>
         <div className="ld-hint">
           이 섹터 안에서 종목들의 상대강도 위치 — Sector-RS(섹터 자체 대비, 지수 대비가 아님) 기준. 같은 사분면 구조(LEADING/WEAKENING/IMPROVING/LAGGING)를 공유합니다.
         </div>
