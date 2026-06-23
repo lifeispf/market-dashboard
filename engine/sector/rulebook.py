@@ -46,6 +46,8 @@ class SectorRulebook:
                 extra={
                     "observed_modules": [m.module_id for m in modules],
                     "risk_profile": rs.inputs.get("risk_profile") if rs is not None else None,
+                    "rrg_by_window": rs.inputs.get("rrg_by_window") if rs is not None else None,
+                    "rrg_consensus": rs.inputs.get("rrg_consensus") if rs is not None else None,
                 },
             )
 
@@ -84,5 +86,7 @@ class SectorRulebook:
                 "quadrant": rs.inputs.get("quadrant"),
                 "approximation": rs.inputs.get("approximation"),
                 "risk_profile": rs.inputs.get("risk_profile"),
+                "rrg_by_window": rs.inputs.get("rrg_by_window"),
+                "rrg_consensus": rs.inputs.get("rrg_consensus"),
             },
         )

@@ -117,6 +117,18 @@ class SectorEngineLiveSmokeTests(unittest.TestCase):
             self.assertEqual(eo.tier, "sector")
             json.dumps(eo.to_dict())  # 직렬화 가능해야 한다
 
+    def test_run_sectors_kospi_has_multi_window_rrg_in_extra(self):
+        # Phase E (§21 D-12): verdict.extra now carries rrg_by_window (1M/3M/6M/12M)
+        # + rrg_consensus, additive alongside the existing single-window fields.
+        outputs = run_sectors("KOSPI")
+        self.assertGreater(len(outputs), 0)
+        for eo in outputs:
+            self.assertIn("rrg_by_window", eo.verdict.extra)
+            rrg_by_window = eo.verdict.extra["rrg_by_window"]
+            self.assertIsInstance(rrg_by_window, dict)
+            self.assertEqual(set(rrg_by_window.keys()), {"1M", "3M", "6M", "12M"})
+            self.assertIn("rrg_consensus", eo.verdict.extra)
+
     def test_run_sectors_nasdaq_serializable(self):
         outputs = run_sectors("NASDAQ")
         self.assertIsInstance(outputs, list)

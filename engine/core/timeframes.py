@@ -82,3 +82,8 @@ def lookback_days_for(tf: str) -> int:
     1M/1Q/1Y가 실제로 읽을 수 있도록 tf가 길수록 더 깊이 읽는다. tf="1D"는 400으로
     기존과 동일 -- byte-identical 불변식 보증."""
     return _LOOKBACK_DAYS.get(normalize_tf(tf), 400)
+
+
+# Phase E (§21 D-12): 멀티 윈도우 RRG 표준 lookback(거래일, ≈ 캘린더 1M/3M/6M/12M).
+# `tf` 셀렉터와 무관하게 항상 이 4개 윈도우를 동시 관찰한다(블루프린트 §21).
+RRG_WINDOWS: dict[str, int] = {"1M": 21, "3M": 63, "6M": 126, "12M": 252}

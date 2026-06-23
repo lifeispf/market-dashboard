@@ -20,7 +20,13 @@ import scoring
 from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import leadership_fetcher
-from engine.core.timeframes import lookback_days_for, normalize_tf, resample_for_tf, rrg_window_for
+from engine.core.timeframes import (
+    RRG_WINDOWS,
+    lookback_days_for,
+    normalize_tf,
+    resample_for_tf,
+    rrg_window_for,
+)
 
 from backend.api._assembly_helpers import (
     _cached_market_cap,
@@ -45,6 +51,63 @@ class SectorRow:
     rs_ratio: float | None
     rs_momentum: float | None
     quadrant: str | None
+    # Phase E (§21 D-12): 1M/3M/6M/12M 동시관찰 RRG — ADDITIVE, tf와 무관하게
+    # 항상 4개 표준 윈도우로 계산. sector_rows_to_payload()에는 포함하지 않는다
+    # (동결 7필드 payload byte-identical 보존).
+    rrg_by_window: dict[str, dict[str, Any] | None] | None = None
+    rrg_consensus: dict[str, Any] | None = None
+
+
+def compute_multi_window_rrg(sector_series, benchmark_series) -> tuple[dict[str, dict[str, Any] | None], dict[str, Any] | None]:
+    """1M/3M/6M/12M(RRG_WINDOWS) 동시관찰 RRG — §21 D-12.
+
+    각 (label, W)에 대해 scoring.compute_rs_ratio_momentum(ratio_window=W,
+    momentum_window=W)을 그대로 호출한다(공식 단일 출처 보존). 데이터가 모자라면
+    그 윈도우는 None(절대 raise하지 않음 — scoring 자체가 None-안전).
+
+    합의(consensus)는 None이 아닌 윈도우들의 quadrant 중 최빈값(modal)이다.
+    동률이면 더 긴 윈도우 쪽을 선호한다(긴 윈도우가 더 신뢰도 높은 구조적 신호).
+    하나도 해석 가능한 윈도우가 없으면 consensus=None.
+
+    Returns:
+        (rrg_by_window, consensus) — rrg_by_window는 RRG_WINDOWS의 모든 라벨을
+        키로 갖는다(값은 dict 또는 None). consensus는
+        {"quadrant", "agreement", "n"} 또는 None.
+    """
+    by_window: dict[str, dict[str, Any] | None] = {}
+    for label, window in RRG_WINDOWS.items():
+        if sector_series is None or benchmark_series is None:
+            by_window[label] = None
+            continue
+        rs_r, rs_m = scoring.compute_rs_ratio_momentum(
+            sector_series, benchmark_series, ratio_window=window, momentum_window=window,
+        )
+        quadrant = scoring.rrg_quadrant(rs_r, rs_m)
+        by_window[label] = (
+            {"ratio": rs_r, "momentum": rs_m, "quadrant": quadrant}
+            if quadrant is not None
+            else None
+        )
+
+    # Longer windows should win quadrant ties -> iterate from longest to shortest so
+    # the first-seen max count in a tie belongs to the longest window.
+    ordered_labels = sorted(RRG_WINDOWS, key=lambda lbl: RRG_WINDOWS[lbl], reverse=True)
+    resolved_quadrants = [by_window[lbl]["quadrant"] for lbl in ordered_labels if by_window[lbl] is not None]
+    n = len(resolved_quadrants)
+    if n == 0:
+        return by_window, None
+
+    counts: dict[str, int] = {}
+    first_seen_order: list[str] = []
+    for q in resolved_quadrants:
+        if q not in counts:
+            counts[q] = 0
+            first_seen_order.append(q)
+        counts[q] += 1
+    modal_quadrant = max(first_seen_order, key=lambda q: counts[q])
+    agreement = counts[modal_quadrant] / n
+    consensus = {"quadrant": modal_quadrant, "agreement": agreement, "n": n}
+    return by_window, consensus
 
 
 def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
@@ -77,6 +140,14 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
     sector_rows: list[SectorRow] = []
     benchmark_ytd = _ytd_slice(benchmark_series)
     benchmark_for_rrg = benchmark_ytd if tf == "1D" else benchmark_series
+
+    # Phase E (§21 D-12): multi-window RRG is independent of `tf` — always read the
+    # deep daily FULL benchmark series (12M window needs ~505 daily bars; lookback_days_for
+    # ("1D") only fetches 400 days, so re-read with the deepest standard lookback regardless
+    # of the caller's tf). _cached_series is a same-day DB read-through cache, so this is a
+    # cheap re-read (no extra network fetch) when lookback_days already covers this range.
+    deep_lookback_days = lookback_days_for("1Y")
+    benchmark_deep_full = _cached_series(index_id, index_fetch_fn, index_source, lookback_days=deep_lookback_days)
     for code, sdef in sector_defs.items():
         if "etf" in sdef and sdef["etf"] in registry:
             etf = sdef["etf"]
@@ -84,6 +155,10 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
             full_series = _cached_series(etf, fetch_fn, source, lookback_days=lookback_days)
             sector_series = _ytd_slice(full_series)
             sector_series_for_rrg = sector_series if tf == "1D" else full_series
+            sector_deep_full = (
+                full_series if lookback_days >= deep_lookback_days
+                else _cached_series(etf, fetch_fn, source, lookback_days=deep_lookback_days)
+            )
         else:
             const_full = []
             for tk in sdef.get("tickers", []):
@@ -94,6 +169,16 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
             const_ytd = [_ytd_slice(s) for s in const_full]
             sector_series = scoring.build_aggregate_series(const_ytd)
             sector_series_for_rrg = sector_series if tf == "1D" else scoring.build_aggregate_series(const_full)
+            if lookback_days >= deep_lookback_days:
+                sector_deep_full = scoring.build_aggregate_series(const_full)
+            else:
+                const_deep_full = []
+                for tk in sdef.get("tickers", []):
+                    if tk not in registry:
+                        continue
+                    fetch_fn, source = registry[tk]
+                    const_deep_full.append(_cached_series(tk, fetch_fn, source, lookback_days=deep_lookback_days))
+                sector_deep_full = scoring.build_aggregate_series(const_deep_full)
 
         market_caps = [_cached_market_cap(tk) for tk in sdef.get("tickers", [])]
         sector_cap = sum(c for c in market_caps if c) or None
@@ -112,10 +197,14 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
             else (None, None)
         )
         quadrant = scoring.rrg_quadrant(rs_r, rs_m)
+
+        rrg_by_window, rrg_consensus = compute_multi_window_rrg(sector_deep_full, benchmark_deep_full)
+
         sector_rows.append(
             SectorRow(
                 code=code, name=sdef["name"], market_cap=sector_cap,
                 ytd=ytd, rs_ratio=rs_r, rs_momentum=rs_m, quadrant=quadrant,
+                rrg_by_window=rrg_by_window, rrg_consensus=rrg_consensus,
             )
         )
         if tf == "1D":

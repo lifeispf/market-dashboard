@@ -75,6 +75,7 @@ class SectorRelativeStrengthModule:
                     "rs_ratio": data.rs_ratio, "rs_momentum": data.rs_momentum,
                     "quadrant": quadrant, "approximation": "single_window",
                     "risk_profile": classify(entity_id),
+                    "rrg_by_window": data.rrg_by_window, "rrg_consensus": data.rrg_consensus,
                 },
             )
 
@@ -90,5 +91,6 @@ class SectorRelativeStrengthModule:
                 "rs_ratio": data.rs_ratio, "rs_momentum": data.rs_momentum,
                 "quadrant": quadrant, "approximation": "single_window",
                 "risk_profile": classify(entity_id),
+                "rrg_by_window": data.rrg_by_window, "rrg_consensus": data.rrg_consensus,
             },
         )
