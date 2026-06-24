@@ -13,10 +13,6 @@ on:
     - cron: "30 6 * * *"   # 15:30 KST (06:30 UTC) — KOSPI 마감
     - cron: "30 13 * * *"  # 22:30 KST (13:30 UTC) — KOSPI 종가 정착 후
   workflow_dispatch: {}  # 수동 실행 버튼
-  # 임시: 워크플로 파일 변경 push 시 1회 실행(등록 강제 + 동작 검증). 검증 후 제거 예정.
-  push:
-    paths:
-      - ".github/workflows/refresh-payloads.yml"
 
 concurrency:
   group: refresh-payloads
