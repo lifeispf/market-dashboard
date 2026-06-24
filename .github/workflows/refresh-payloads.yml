@@ -5,8 +5,13 @@ name: refresh-payloads
 # 러너, 한도 없음)서 기존 Python 엔진을 돌려 모든 payload를 만들고 KV에 bulk put 한다.
 on:
   schedule:
-    # 22:00 UTC, 일~목 = 07:00 KST, 월~금(KST 평일 아침). 양 시장 마감 후.
-    - cron: "0 22 * * 0-4"
+    # GitHub cron은 UTC. KST = UTC+9. 하루 4회(KST 04:30 / 09:00 / 15:30 / 22:30).
+    # 매일 실행 — KST↔UTC 요일 경계 어긋남 방지 + 주말은 직전 종가 재서빙이라 무해.
+    # 참고: GitHub 스케줄은 수 분~십수 분 지연될 수 있다(정시 슬롯일수록).
+    - cron: "30 19 * * *"  # 04:30 KST (전일 19:30 UTC) — 美 마감 직전
+    - cron: "0 0 * * *"    # 09:00 KST (00:00 UTC) — 美 종가 정착 후
+    - cron: "30 6 * * *"   # 15:30 KST (06:30 UTC) — KOSPI 마감
+    - cron: "30 13 * * *"  # 22:30 KST (13:30 UTC) — KOSPI 종가 정착 후
   workflow_dispatch: {}  # 수동 실행 버튼
 
 concurrency:
