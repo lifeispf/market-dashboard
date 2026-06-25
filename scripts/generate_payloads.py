@@ -76,6 +76,12 @@ def main(argv=None):
     parser.add_argument("--out", default="kv_payloads.json", help="Output bulk JSON path.")
     args = parser.parse_args(argv)
 
+    # 라우트 함수를 직접 호출하면 FastAPI startup 이벤트(backend/main.py의 db.init_db())가
+    # 안 돈다 → 새 환경(예: CI 러너)엔 series_daily 등 테이블이 없어 전 payload가 degrade
+    # ("no such table: series_daily"). 명시적으로 스키마를 보장한다.
+    from backend.store import db
+    db.init_db()
+
     print(f"Generating payloads ({len(MARKETS)} markets x {len(TFS)} tf + verification + health)...")
     entries = build_entries()
 
