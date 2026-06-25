@@ -135,6 +135,7 @@
 .ld-fg-factors{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .ld-fg-factor{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim)}
 .ld-fg-factor .fn{font-family:var(--mono);min-width:54px;color:var(--text-faint)}
+.ld-fg-factor .fval{font-family:var(--mono);font-size:9.5px;min-width:80px;text-align:right;color:var(--text-faint);opacity:.85}
 .ld-fg-factor .track{flex:1}
 .ld-fg-factor .fv{font-family:var(--mono);min-width:34px;text-align:right;color:var(--text-faint)}
 

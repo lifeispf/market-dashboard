@@ -23,6 +23,25 @@ interface FearGreedGaugeProps {
 // 5-zone diverging track cut points — mirrors server LABEL_BANDS (<25/<45/<56/<75/else).
 const FG_ZONE_CUTS = [25, 45, 56, 75];
 
+// 각 팩터의 raw 측정값을 의미 있는 단위로 표기 — "변동성 0"이 "측정 안 됨"처럼
+// 보이는 혼동을 없앤다(예: F3 변동성 score 0이어도 실제 VKOSPI 94.8을 함께 노출).
+// factor id(F1~F4)는 §13-1에서 고정 의미라 id별 단위 포맷이 안전하다.
+function factorValueText(id: string, value: number | null | undefined): string | null {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  switch (id) {
+    case "F1": // 모멘텀: (지수/125일MA − 1)×100
+      return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+    case "F2": // 강도: 상승/(상승+하락) 비율
+      return `상승 ${(value * 100).toFixed(0)}%`;
+    case "F3": // 변동성: VKOSPI(or 실현변동성 근사) 레벨
+      return `VKOSPI ${value.toFixed(1)}`;
+    case "F4": // 신용: HY OAS(%)
+      return `OAS ${value.toFixed(2)}%`;
+    default:
+      return value.toFixed(1);
+  }
+}
+
 // tf -> native-cadence-aware label for the F&G score-trend sparkline.
 const TF_TREND_LABEL: Record<Timeframe, string> = {
   "1D": "심리 추세 (일봉)",
@@ -85,17 +104,21 @@ export default function FearGreedGauge({ fearGreed, trend = [], tf = "1D" }: Fea
           <summary>구성 팩터 펼치기</summary>
           {factors && factors.length > 0 ? (
             <div className="ld-fg-factors">
-              {factors.map((f) => (
-                <div className="ld-fg-factor" key={f.id}>
-                  <span className="fn">{f.name}</span>
-                  <div className="track">
-                    {f.score !== null && f.score !== undefined ? (
-                      <div className={`fill fg-${fearGreedColor(f.score)}`} style={{ width: Math.max(0, Math.min(100, f.score)) + "%" }} />
-                    ) : null}
+              {factors.map((f) => {
+                const valText = factorValueText(f.id, f.value);
+                return (
+                  <div className="ld-fg-factor" key={f.id}>
+                    <span className="fn">{f.name}</span>
+                    <span className="fval">{valText ?? "—"}</span>
+                    <div className="track">
+                      {f.score !== null && f.score !== undefined ? (
+                        <div className={`fill fg-${fearGreedColor(f.score)}`} style={{ width: Math.max(0, Math.min(100, f.score)) + "%" }} />
+                      ) : null}
+                    </div>
+                    <span className="fv">{f.score === null || f.score === undefined ? "N/A" : Math.round(f.score)}</span>
                   </div>
-                  <span className="fv">{f.score === null || f.score === undefined ? "N/A" : Math.round(f.score)}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="ld-fg-factors-empty">팩터 데이터 없음</div>
