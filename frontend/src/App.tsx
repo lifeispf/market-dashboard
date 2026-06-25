@@ -103,7 +103,7 @@ function App() {
           centered-column DOM subtree entirely. */}
       <TimeframeSelector tf={tf} setTf={setTf} />
       <div className="ld-wrap">
-        <Header market={market} setMarket={setMarket} pill={payload.pill} asOf={payload.asOf} />
+        <Header market={market} setMarket={setMarket} pill={payload.pill} asOf={payload.asOf} generatedAt={payload.generatedAt} />
         <CrossNarrativeBadge narrative={payload.narrative} rec={payload.reconciliation} />
         <FlowSection flow={payload.flow} tf={tf} />
         <LiquiditySection

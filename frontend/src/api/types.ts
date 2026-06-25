@@ -70,6 +70,12 @@ export interface FreshnessItem { label: string; source: string; freq: string; la
 export interface MarketPayload {
   market: "KOSPI" | "NASDAQ";
   asOf: string;
+  // Optional, additive — NOT produced by the live backend route; injected by the
+  // KV deploy generator (scripts/generate_payloads.py) at snapshot-build time so the
+  // header can show a refresh date+time that actually changes each Action run (asOf
+  // is the last trading day and is static intraday). Absent in local dev → header
+  // falls back to "· 스냅샷". ISO 8601 with +09:00 offset.
+  generatedAt?: string;
   source: string;
   pill: string;
   flow: Flow;

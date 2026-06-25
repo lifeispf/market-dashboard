@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 # Make the repo root importable (so `backend`/`engine` resolve) regardless of CWD —
 # this script lives in scripts/ which would otherwise be the only path entry.
@@ -32,9 +33,13 @@ MARKETS = ("KOSPI", "NASDAQ")
 TFS = ("1D", "1W", "1M", "1Q", "1Y")
 
 
-def build_entries() -> list[dict]:
+def build_entries(generated_at: str) -> list[dict]:
     """라우트 함수를 직접 호출해 [{"key","value"}] 항목을 만든다. key는 Worker가
-    URL→KV키로 매핑하는 스킴(market:{m}:{tf} 등)과 정확히 일치한다."""
+    URL→KV키로 매핑하는 스킴(market:{m}:{tf} 등)과 정확히 일치한다.
+
+    generated_at: 이 스냅샷 생성 시각(ISO/KST). market payload에 `generatedAt`로
+    주입해 프론트가 '갱신 시각'을 표시 — asOf(데이터 기준 거래일)는 장중 불변이라
+    매 새로고침마다 바뀌는 신호가 필요하다(우측 상단 기준일/시각 표기)."""
     from backend.api.history import get_history
     from backend.api.market import get_market
     from backend.api.sectors import get_sectors
@@ -45,10 +50,12 @@ def build_entries() -> list[dict]:
     entries: list[dict] = []
     failures: list[str] = []
 
-    def add(key: str, fn):
+    def add(key: str, fn, inject: dict | None = None):
         t0 = time.time()
         try:
             payload = fn()
+            if inject and isinstance(payload, dict):
+                payload = {**payload, **inject}
             entries.append({"key": key, "value": json.dumps(payload, ensure_ascii=False)})
             print(f"  + {key:24s} ({time.time() - t0:.1f}s)")
         except Exception as exc:  # never abort the whole run on one endpoint
@@ -57,7 +64,7 @@ def build_entries() -> list[dict]:
 
     for m in MARKETS:
         for tf in TFS:
-            add(f"market:{m}:{tf}", lambda m=m, tf=tf: get_market(m, tf))
+            add(f"market:{m}:{tf}", lambda m=m, tf=tf: get_market(m, tf), inject={"generatedAt": generated_at})
             add(f"sectors:{m}:{tf}", lambda m=m, tf=tf: get_sectors(m, tf))
             add(f"stocks:{m}:{tf}", lambda m=m, tf=tf: get_stocks(m, tf))
             add(f"history:{m}:{tf}", lambda m=m, tf=tf: get_history(m, tf))
@@ -82,8 +89,13 @@ def main(argv=None):
     from backend.store import db
     db.init_db()
 
+    # 스냅샷 생성 시각(KST). market payload에 주입돼 프론트 '갱신 {날짜 시각} KST'로 표기.
+    # (Action 매 실행마다 갱신되는 유일한 시각 신호 — asOf는 거래일이라 장중 불변.)
+    generated_at = datetime.now(timezone(timedelta(hours=9))).isoformat(timespec="seconds")
+
     print(f"Generating payloads ({len(MARKETS)} markets x {len(TFS)} tf + verification + health)...")
-    entries = build_entries()
+    print(f"  generatedAt = {generated_at}")
+    entries = build_entries(generated_at)
 
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(entries, f, ensure_ascii=False)
