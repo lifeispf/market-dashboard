@@ -35,6 +35,9 @@ from backend.api._assembly_helpers import (
     _ytd_slice,
 )
 
+# #1 트리맵 tf 연동: tf별 기간 수익률 계산용 거래일 수(근사).
+_PERIOD_TRADING_DAYS = {"1D": 1, "1W": 5, "1M": 21, "1Q": 63, "1Y": 252}
+
 
 @dataclass
 class SectorRow:
@@ -57,6 +60,10 @@ class SectorRow:
     # sector_rows_to_payload()에는 포함하지 않는다(동결 7필드 payload byte-identical 보존).
     rrg_by_window: dict[str, dict[str, Any] | None] | None = None
     rrg_consensus: dict[str, Any] | None = None
+    # #1 트리맵 tf 연동: 선택 tf 기간(1D/1W/1M/1Q/1Y)에 대한 섹터 수익률(%). YTD(ytd)는
+    # tf 무관 고정이라 트리맵 색이 안 바뀌던 문제 해결용 — 비동결 /api/sectors envelope에만
+    # 노출(동결 sectors[] payload·등가성 게이트 무관).
+    period_return: float | None = None
 
 
 def compute_multi_window_rrg(sector_series, benchmark_series, windows: dict[str, int]) -> tuple[dict[str, dict[str, Any] | None], dict[str, Any] | None]:
@@ -213,11 +220,21 @@ def gather_sector_inputs(market: str, tf: str = "1D") -> list[SectorRow]:
             sector_deep_full, benchmark_deep_full, rrg_windows_for(tf),
         )
 
+        # #1: 선택 tf 기간 수익률(트리맵 색/라벨용). deep 일별 시리즈에서 N거래일 전 대비.
+        n_back = _PERIOD_TRADING_DAYS.get(tf, 1)
+        period_return = None
+        if sector_deep_full is not None and len(sector_deep_full) > n_back:
+            prev = sector_deep_full.iloc[-1 - n_back]
+            last = sector_deep_full.iloc[-1]
+            if prev:
+                period_return = (last / prev - 1) * 100
+
         sector_rows.append(
             SectorRow(
                 code=code, name=sdef["name"], market_cap=sector_cap,
                 ytd=ytd, rs_ratio=rs_r, rs_momentum=rs_m, quadrant=quadrant,
                 rrg_by_window=rrg_by_window, rrg_consensus=rrg_consensus,
+                period_return=period_return,
             )
         )
         if tf == "1D":

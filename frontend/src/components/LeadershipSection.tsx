@@ -17,6 +17,7 @@ import { AlertTriangle } from "./icons";
 import { quadKr } from "../lib/helpers";
 import { fetchSectors, fetchStocks, type Market, type Timeframe } from "../api/client";
 import type {
+  Constituent,
   EngineOutput,
   HistoryResponse,
   RRGPoint,
@@ -45,6 +46,25 @@ const TF_CANDLE_LABEL: Record<Timeframe, string> = {
   "1Y": "연봉",
 };
 
+// #1 트리맵 tf 연동 — 색이 나타내는 기간 라벨(타이틀/셀 표기용).
+const TF_PERIOD_LABEL: Record<Timeframe, string> = {
+  "1D": "1일",
+  "1W": "1주",
+  "1M": "1개월",
+  "1Q": "1분기",
+  "1Y": "1년",
+};
+
+// tf별 트리맵 색 임계(hot/warm, %). 기간이 길수록 임계가 커진다 — 1D의 +1%와 1Y의
+// +1%는 의미가 다르므로 YTD 고정 밴드 대신 tf별로 스케일한다.
+const TF_COLOR_BANDS: Record<Timeframe, [number, number]> = {
+  "1D": [2, 0.5],
+  "1W": [5, 1],
+  "1M": [10, 3],
+  "1Q": [20, 5],
+  "1Y": [40, 15],
+};
+
 // Ticker -> display name, joined from the curated `leaders` block (same pattern as
 // StockView.buildNameByTicker — duplicated here rather than imported since StockView
 // does not export it and we must not modify StockView.tsx).
@@ -65,11 +85,12 @@ interface LeadershipSectionProps {
   history: HistoryResponse | null;
 }
 
-function treemapColor(ytd: number | null): string {
-  if (ytd === null || ytd === undefined) return "rgba(127,147,196,.22)"; // locked-ish neutral for unknown
-  if (ytd > 40) return "rgba(95,185,142,.45)";
-  if (ytd > 15) return "rgba(95,185,142,.26)";
-  if (ytd >= 0) return "rgba(205,177,90,.22)";
+function treemapColor(ret: number | null | undefined, tf: Timeframe): string {
+  if (ret === null || ret === undefined) return "rgba(127,147,196,.22)"; // locked-ish neutral for unknown
+  const [hot, warm] = TF_COLOR_BANDS[tf];
+  if (ret > hot) return "rgba(95,185,142,.45)";
+  if (ret > warm) return "rgba(95,185,142,.26)";
+  if (ret >= 0) return "rgba(205,177,90,.22)";
   return "rgba(208,107,74,.28)";
 }
 
@@ -148,10 +169,15 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
   // casts (extra is Record<string, unknown> per the Engine Core envelope contract).
   const rrgByWindowByCode: Record<string, Record<string, RrgWindowEntry | null> | undefined> = {};
   const rrgConsensusByCode: Record<string, RrgConsensus | null | undefined> = {};
+  // #1 트리맵 tf 색 + #2/#3 모든 섹터 주도주 — 비동결 envelope verdict.extra에서 읽는다.
+  const periodReturnByCode: Record<string, number | null | undefined> = {};
+  const constituentsByCode: Record<string, Constituent[]> = {};
   for (const o of sectorEnvelopes ?? []) {
     const extra = o.verdict?.extra;
     rrgByWindowByCode[o.entity_id] = extra?.rrg_by_window as Record<string, RrgWindowEntry | null> | undefined;
     rrgConsensusByCode[o.entity_id] = extra?.rrg_consensus as RrgConsensus | null | undefined;
+    periodReturnByCode[o.entity_id] = extra?.period_return as number | null | undefined;
+    constituentsByCode[o.entity_id] = (extra?.constituents as Constituent[] | undefined) ?? [];
   }
 
   const nameByTicker = buildNameByTicker(leaders);
@@ -170,13 +196,23 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
 
   const sel = sectors.find((s) => s.code === selSector) ?? sectors[0];
   const selLeaders: SectorLeaders | undefined = leaders[sel.code];
-  const allLeaders = selLeaders
+  // 큐레이션 주도주(rich: thesis/role/stats/risk) — 클릭 시 상세가 펼쳐지는 종목.
+  const curatedLeaders = selLeaders
     ? [
         ...selLeaders.key.map((l) => ({ ...l, tag: "k" as const })),
         ...(selLeaders.star || []).map((l) => ({ ...l, tag: "s" as const })),
       ]
     : [];
-  const selLeaderObj = allLeaders.find((l) => l.ticker === selLeader) || null;
+  // #2/#3: 모든 섹터에 주도주를 채운다 — 큐레이션(rich) + 구성종목(light, ETF비중/KRX
+  // 시총·거래대금 랭킹), 티커 중복 제거 후 최대 7개. 구성종목은 상세가 없어 note(role)만.
+  const normTk = (t: string) => t.split(".")[0].toUpperCase();
+  const curatedTickers = new Set(curatedLeaders.map((l) => normTk(l.ticker)));
+  const extraConstituents = (constituentsByCode[sel.code] ?? [])
+    .filter((c) => !curatedTickers.has(normTk(c.ticker)))
+    .map((c) => ({ tag: "c" as const, ticker: c.ticker, name: c.name, role: c.note }));
+  const displayLeaders = [...curatedLeaders, ...extraConstituents].slice(0, 7);
+  // 상세 패널은 큐레이션 종목에만 존재(구성종목은 light) — selLeaderObj는 큐레이션에서만 찾는다.
+  const selLeaderObj = curatedLeaders.find((l) => l.ticker === selLeader) || null;
 
   // Phase C: stocks belonging to the selected sector (matched via verdict.extra.sector_code,
   // which the backend now stamps on every stock output), mapped to RRGPoint using their
@@ -242,23 +278,31 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
       <p className="ld-sec-sub">연료가 지금 어느 섹터 · 종목으로 흐르는지 — 섹터 트리맵, 순환매(RRG), 주도주.</p>
 
       <div className="ld-card-title" style={{ marginTop: 6 }}>
-        섹터 트리맵 (크기 = 시가총액, 색 = YTD)
+        섹터 트리맵 (크기 = 시가총액, 색 = {TF_PERIOD_LABEL[tf]} 수익률)
       </div>
       <div className="ld-treemap">
-        {sectors.map((s) => (
-          <button
-            key={s.code}
-            className={`ld-cell ${selSector === s.code ? "sel" : ""}`}
-            style={{ flexGrow: Math.max(1, Math.log10((s.marketCap ?? 1) + 1)), background: treemapColor(s.ytd) }}
-            onClick={() => {
-              setSelSector(s.code);
-              setSelLeader(null);
-            }}
-          >
-            <span className="nm">{s.name}</span>
-            <span className="pc">{s.ytd === null ? "N/A" : `${s.ytd >= 0 ? "+" : ""}${s.ytd.toFixed(0)}%`}</span>
-          </button>
-        ))}
+        {sectors.map((s) => {
+          // #1: 색/라벨을 선택 tf 기간수익률로(envelope 로딩 전엔 YTD 폴백).
+          const ret = periodReturnByCode[s.code] ?? s.ytd;
+          return (
+            <button
+              key={s.code}
+              className={`ld-cell ${selSector === s.code ? "sel" : ""}`}
+              style={{ flexGrow: Math.max(1, Math.log10((s.marketCap ?? 1) + 1)), background: treemapColor(ret, tf) }}
+              onClick={() => {
+                setSelSector(s.code);
+                setSelLeader(null);
+              }}
+            >
+              <span className="nm">{s.name}</span>
+              <span className="pc">
+                {ret === null || ret === undefined
+                  ? "N/A"
+                  : `${ret >= 0 ? "+" : ""}${ret.toFixed(Math.abs(ret) >= 100 ? 0 : 1)}%`}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="ld-grid2" style={{ marginTop: 18 }}>
@@ -297,18 +341,18 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
             {sel.name} · {quadKr(sel.quadrant)}
           </div>
           <div className="ld-hint">섹터를 클릭하면 종목 정보가 바뀝니다. 카드를 클릭하면 상세가 펼쳐집니다.</div>
-          {allLeaders.length > 0 ? (
+          {displayLeaders.length > 0 ? (
             <>
               <div className="ld-cards">
-                {allLeaders.map((l) => (
+                {displayLeaders.map((l) => (
                   <button
                     key={l.ticker}
                     className={`ld-pcard ${selLeader === l.ticker ? "sel" : ""}`}
                     onClick={() => setSelLeader(selLeader === l.ticker ? null : l.ticker)}
                   >
                     <div className="top">
-                      <span className="tk">{l.ticker}</span>
-                      <span className={`ld-tag ${l.tag}`}>{l.tag === "k" ? "Key" : "Star"}</span>
+                      <span className="tk">{normTk(l.ticker)}</span>
+                      <span className={`ld-tag ${l.tag}`}>{l.tag === "k" ? "Key" : l.tag === "s" ? "Star" : "주도"}</span>
                     </div>
                     <div className="nm">{l.name}</div>
                     <div className="rl">{l.role}</div>
@@ -341,8 +385,10 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
                 </div>
               )}
             </>
+          ) : sectorEnvelopes === null ? (
+            <div className="ld-simple">주도주 불러오는 중…</div>
           ) : (
-            <div className="ld-simple">이 섹터는 큐레이션된 주도주 데이터가 없습니다 (leaders 미생략).</div>
+            <div className="ld-simple">이 섹터 주도주 데이터 없음.</div>
           )}
         </div>
       </div>

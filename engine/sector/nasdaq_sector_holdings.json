@@ -1,0 +1,508 @@
+{
+ "Tech": {
+  "etf": "XLK",
+  "name": "Technology",
+  "holdings": [
+   {
+    "ticker": "NVDA",
+    "name": "NVIDIA Corp",
+    "weight": 0.1307
+   },
+   {
+    "ticker": "AAPL",
+    "name": "Apple Inc",
+    "weight": 0.1167
+   },
+   {
+    "ticker": "MSFT",
+    "name": "Microsoft Corp",
+    "weight": 0.0852
+   },
+   {
+    "ticker": "MU",
+    "name": "Micron Technology Inc",
+    "weight": 0.0678
+   },
+   {
+    "ticker": "AVGO",
+    "name": "Broadcom Inc",
+    "weight": 0.054
+   },
+   {
+    "ticker": "AMD",
+    "name": "Advanced Micro Devices Inc",
+    "weight": 0.0522
+   },
+   {
+    "ticker": "INTC",
+    "name": "Intel Corp",
+    "weight": 0.0334
+   },
+   {
+    "ticker": "CSCO",
+    "name": "Cisco Systems Inc",
+    "weight": 0.0295
+   }
+  ]
+ },
+ "Fin": {
+  "etf": "XLF",
+  "name": "Financials",
+  "holdings": [
+   {
+    "ticker": "BRK-B",
+    "name": "Berkshire Hathaway Inc Class B",
+    "weight": 0.1183
+   },
+   {
+    "ticker": "JPM",
+    "name": "JPMorgan Chase & Co",
+    "weight": 0.1098
+   },
+   {
+    "ticker": "V",
+    "name": "Visa Inc Class A",
+    "weight": 0.0746
+   },
+   {
+    "ticker": "MA",
+    "name": "Mastercard Inc Class A",
+    "weight": 0.0547
+   },
+   {
+    "ticker": "BAC",
+    "name": "Bank of America Corp",
+    "weight": 0.0466
+   },
+   {
+    "ticker": "GS",
+    "name": "The Goldman Sachs Group Inc",
+    "weight": 0.0418
+   },
+   {
+    "ticker": "MS",
+    "name": "Morgan Stanley",
+    "weight": 0.034
+   },
+   {
+    "ticker": "WFC",
+    "name": "Wells Fargo & Co",
+    "weight": 0.0326
+   }
+  ]
+ },
+ "Energy": {
+  "etf": "XLE",
+  "name": "Energy",
+  "holdings": [
+   {
+    "ticker": "XOM",
+    "name": "Exxon Mobil Corp",
+    "weight": 0.2212
+   },
+   {
+    "ticker": "CVX",
+    "name": "Chevron Corp",
+    "weight": 0.166
+   },
+   {
+    "ticker": "COP",
+    "name": "ConocoPhillips",
+    "weight": 0.0678
+   },
+   {
+    "ticker": "SLB",
+    "name": "SLB Ltd",
+    "weight": 0.0469
+   },
+   {
+    "ticker": "WMB",
+    "name": "Williams Companies Inc",
+    "weight": 0.0433
+   },
+   {
+    "ticker": "VLO",
+    "name": "Valero Energy Corp",
+    "weight": 0.043
+   },
+   {
+    "ticker": "MPC",
+    "name": "Marathon Petroleum Corp",
+    "weight": 0.0422
+   },
+   {
+    "ticker": "EOG",
+    "name": "EOG Resources Inc",
+    "weight": 0.0416
+   }
+  ]
+ },
+ "ConsDisc": {
+  "etf": "XLY",
+  "name": "Consumer Disc.",
+  "holdings": [
+   {
+    "ticker": "AMZN",
+    "name": "Amazon.com Inc",
+    "weight": 0.2756
+   },
+   {
+    "ticker": "TSLA",
+    "name": "Tesla Inc",
+    "weight": 0.2004
+   },
+   {
+    "ticker": "HD",
+    "name": "The Home Depot Inc",
+    "weight": 0.0516
+   },
+   {
+    "ticker": "TJX",
+    "name": "TJX Companies Inc",
+    "weight": 0.0385
+   },
+   {
+    "ticker": "MCD",
+    "name": "McDonald's Corp",
+    "weight": 0.0364
+   },
+   {
+    "ticker": "BKNG",
+    "name": "Booking Holdings Inc",
+    "weight": 0.0303
+   },
+   {
+    "ticker": "LOW",
+    "name": "Lowe's Companies Inc",
+    "weight": 0.027
+   },
+   {
+    "ticker": "SBUX",
+    "name": "Starbucks Corp",
+    "weight": 0.0253
+   }
+  ]
+ },
+ "Health": {
+  "etf": "XLV",
+  "name": "Health Care",
+  "holdings": [
+   {
+    "ticker": "LLY",
+    "name": "Eli Lilly and Co",
+    "weight": 0.1618
+   },
+   {
+    "ticker": "JNJ",
+    "name": "Johnson & Johnson",
+    "weight": 0.1003
+   },
+   {
+    "ticker": "ABBV",
+    "name": "AbbVie Inc",
+    "weight": 0.0711
+   },
+   {
+    "ticker": "UNH",
+    "name": "UnitedHealth Group Inc",
+    "weight": 0.0637
+   },
+   {
+    "ticker": "MRK",
+    "name": "Merck & Co Inc",
+    "weight": 0.0545
+   },
+   {
+    "ticker": "TMO",
+    "name": "Thermo Fisher Scientific Inc",
+    "weight": 0.0342
+   },
+   {
+    "ticker": "AMGN",
+    "name": "Amgen Inc",
+    "weight": 0.0335
+   },
+   {
+    "ticker": "GILD",
+    "name": "Gilead Sciences Inc",
+    "weight": 0.0308
+   }
+  ]
+ },
+ "Comm": {
+  "etf": "XLC",
+  "name": "Communication",
+  "holdings": [
+   {
+    "ticker": "META",
+    "name": "Meta Platforms Inc Class A",
+    "weight": 0.1402
+   },
+   {
+    "ticker": "GOOGL",
+    "name": "Alphabet Inc Class A",
+    "weight": 0.0982
+   },
+   {
+    "ticker": "GOOG",
+    "name": "Alphabet Inc Class C",
+    "weight": 0.0781
+   },
+   {
+    "ticker": "TTWO",
+    "name": "Take-Two Interactive Software Inc",
+    "weight": 0.0488
+   },
+   {
+    "ticker": "LYV",
+    "name": "Live Nation Entertainment Inc",
+    "weight": 0.0476
+   },
+   {
+    "ticker": "SATS",
+    "name": "EchoStar Corp Class A",
+    "weight": 0.0462
+   },
+   {
+    "ticker": "DIS",
+    "name": "The Walt Disney Co",
+    "weight": 0.0453
+   },
+   {
+    "ticker": "WBD",
+    "name": "Warner Bros. Discovery Inc Ordinary Shares - Class A",
+    "weight": 0.0419
+   }
+  ]
+ },
+ "Indus": {
+  "etf": "XLI",
+  "name": "Industrials",
+  "holdings": [
+   {
+    "ticker": "CAT",
+    "name": "Caterpillar Inc",
+    "weight": 0.0755
+   },
+   {
+    "ticker": "GE",
+    "name": "GE Aerospace",
+    "weight": 0.0629
+   },
+   {
+    "ticker": "GEV",
+    "name": "GE Vernova Inc",
+    "weight": 0.0484
+   },
+   {
+    "ticker": "RTX",
+    "name": "RTX Corp",
+    "weight": 0.0447
+   },
+   {
+    "ticker": "BA",
+    "name": "Boeing Co",
+    "weight": 0.0336
+   },
+   {
+    "ticker": "UNP",
+    "name": "Union Pacific Corp",
+    "weight": 0.0289
+   },
+   {
+    "ticker": "ETN",
+    "name": "Eaton Corp PLC",
+    "weight": 0.0288
+   },
+   {
+    "ticker": "HON",
+    "name": "Honeywell International Inc",
+    "weight": 0.028
+   }
+  ]
+ },
+ "Staples": {
+  "etf": "XLP",
+  "name": "Cons. Staples",
+  "holdings": [
+   {
+    "ticker": "WMT",
+    "name": "Walmart Inc",
+    "weight": 0.1083
+   },
+   {
+    "ticker": "COST",
+    "name": "Costco Wholesale Corp",
+    "weight": 0.0906
+   },
+   {
+    "ticker": "PG",
+    "name": "Procter & Gamble Co",
+    "weight": 0.0712
+   },
+   {
+    "ticker": "KO",
+    "name": "Coca-Cola Co",
+    "weight": 0.0653
+   },
+   {
+    "ticker": "PM",
+    "name": "Philip Morris International Inc",
+    "weight": 0.059
+   },
+   {
+    "ticker": "MDLZ",
+    "name": "Mondelez International Inc Class A",
+    "weight": 0.0499
+   },
+   {
+    "ticker": "MO",
+    "name": "Altria Group Inc",
+    "weight": 0.0474
+   },
+   {
+    "ticker": "CL",
+    "name": "Colgate-Palmolive Co",
+    "weight": 0.0455
+   }
+  ]
+ },
+ "Util": {
+  "etf": "XLU",
+  "name": "Utilities",
+  "holdings": [
+   {
+    "ticker": "NEE",
+    "name": "NextEra Energy Inc",
+    "weight": 0.1319
+   },
+   {
+    "ticker": "SO",
+    "name": "Southern Co",
+    "weight": 0.0737
+   },
+   {
+    "ticker": "DUK",
+    "name": "Duke Energy Corp",
+    "weight": 0.0694
+   },
+   {
+    "ticker": "CEG",
+    "name": "Constellation Energy Corp",
+    "weight": 0.0652
+   },
+   {
+    "ticker": "AEP",
+    "name": "American Electric Power Co Inc",
+    "weight": 0.0498
+   },
+   {
+    "ticker": "SRE",
+    "name": "Sempra",
+    "weight": 0.0423
+   },
+   {
+    "ticker": "D",
+    "name": "Dominion Energy Inc",
+    "weight": 0.0416
+   },
+   {
+    "ticker": "VST",
+    "name": "Vistra Corp",
+    "weight": 0.0371
+   }
+  ]
+ },
+ "RE": {
+  "etf": "XLRE",
+  "name": "Real Estate",
+  "holdings": [
+   {
+    "ticker": "WELL",
+    "name": "Welltower Inc",
+    "weight": 0.0986
+   },
+   {
+    "ticker": "PLD",
+    "name": "Prologis Inc",
+    "weight": 0.0918
+   },
+   {
+    "ticker": "EQIX",
+    "name": "Equinix Inc",
+    "weight": 0.0722
+   },
+   {
+    "ticker": "AMT",
+    "name": "American Tower Corp",
+    "weight": 0.0602
+   },
+   {
+    "ticker": "SPG",
+    "name": "Simon Property Group Inc",
+    "weight": 0.0468
+   },
+   {
+    "ticker": "DLR",
+    "name": "Digital Realty Trust Inc",
+    "weight": 0.0455
+   },
+   {
+    "ticker": "PSA",
+    "name": "Public Storage",
+    "weight": 0.0438
+   },
+   {
+    "ticker": "VTR",
+    "name": "Ventas Inc",
+    "weight": 0.0423
+   }
+  ]
+ },
+ "Mat": {
+  "etf": "XLB",
+  "name": "Materials",
+  "holdings": [
+   {
+    "ticker": "LIN",
+    "name": "Linde PLC",
+    "weight": 0.1415
+   },
+   {
+    "ticker": "NEM",
+    "name": "Newmont Corp",
+    "weight": 0.0729
+   },
+   {
+    "ticker": "NUE",
+    "name": "Nucor Corp",
+    "weight": 0.0635
+   },
+   {
+    "ticker": "FCX",
+    "name": "Freeport-McMoRan Inc",
+    "weight": 0.0575
+   },
+   {
+    "ticker": "VMC",
+    "name": "Vulcan Materials Co",
+    "weight": 0.0458
+   },
+   {
+    "ticker": "CRH",
+    "name": "CRH PLC",
+    "weight": 0.0456
+   },
+   {
+    "ticker": "APD",
+    "name": "Air Products and Chemicals Inc",
+    "weight": 0.0438
+   },
+   {
+    "ticker": "STLD",
+    "name": "Steel Dynamics Inc",
+    "weight": 0.0437
+   }
+  ]
+ }
+}

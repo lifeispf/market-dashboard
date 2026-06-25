@@ -181,6 +181,19 @@ export interface StocksResponse {
   stocks: EngineOutput[];
 }
 
+// Sector constituent (NOT frozen) — additive on the /api/sectors envelope verdict.extra.
+// Fills leading-stocks for ALL sectors (curated leaders cover only ~2/market): NASDAQ
+// from sector-ETF holdings (note = weight), KOSPI from an authored ticker→sector map
+// ranked by market cap + trading-value surge (note = 시총/거래대금 증가폭). source marks
+// origin. period_return (also on verdict.extra) is the sector's return over the selected
+// tf window, used to color the treemap per-timeframe instead of a fixed YTD.
+export interface Constituent {
+  ticker: string;
+  name: string;
+  note: string;
+  source: "etf" | "krx";
+}
+
 // ---------------------------------------------------------------------------
 // History tier (NOT frozen) — mirror of backend/api/history.py. Sector RRG
 // trail (rsRatio/rsMomentum over time) for the trail-overlay feature in
