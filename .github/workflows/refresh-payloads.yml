@@ -47,7 +47,9 @@ jobs:
       - name: Generate payloads
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          # KRX_ID/KRX_PW는 미설정 → 국내 수급 팩터는 현행처럼 degrade(null).
+          # KRX 정보데이터시스템 OpenAPI 키 — KOSPI breadth(F2 강도)·시총·지수.
+          # 미설정 시 국내 수급 팩터는 현행처럼 degrade(null).
+          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
         run: python scripts/generate_payloads.py --out kv_payloads.json
 
       - name: Upload payloads to Cloudflare KV
