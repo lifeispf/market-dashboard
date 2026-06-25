@@ -16,7 +16,7 @@ from unittest.mock import patch
 from backend.api._reference_assembly import assemble_live_reference
 from backend.api.market import _assemble_live
 from backend.store.db import get_connection
-from engine.macro import eps_source, inputs as macro_inputs
+from engine.macro import eps_source, vkospi_source, inputs as macro_inputs
 
 
 def _purge_eps_cache():
@@ -57,6 +57,12 @@ class MacroEquivalenceTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(_purge_eps_cache)
+        # VKOSPI도 EPS와 같은 이유로 중립화 — 동결 오라클은 realized-vol을 쓰므로
+        # KRX_API_KEY가 있는 환경에서 VKOSPI가 붙으면 발산한다. None으로 막아
+        # 게이트가 검증하려는 로직 패리티(realized-vol 기준)를 유지한다.
+        vk_patcher = patch.object(vkospi_source, "fetch_vkospi", return_value=None)
+        vk_patcher.start()
+        self.addCleanup(vk_patcher.stop)
 
     def test_kospi_byte_identical(self):
         new_payload = _assemble_live("KOSPI")

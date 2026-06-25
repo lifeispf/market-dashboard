@@ -19,5 +19,8 @@ def health():
         "status": "ok",
         "db": db_ok,
         "fredKey": bool(os.environ.get("FRED_API_KEY")),
-        "krxAuth": bool(os.environ.get("KRX_ID") and os.environ.get("KRX_PW")),
+        "krxAuth": bool(
+            os.environ.get("KRX_API_KEY")
+            or (os.environ.get("KRX_ID") and os.environ.get("KRX_PW"))
+        ),
     }

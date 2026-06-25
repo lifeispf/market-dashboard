@@ -31,7 +31,7 @@ from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import kr_fetcher, manual
 from engine.core.timeframes import lookback_days_for, normalize_tf, resample_for_tf, spark_n_for
-from engine.macro import eps_source
+from engine.macro import eps_source, vkospi_source
 
 from backend.api._assembly_helpers import _cached_series, _last, _as_of_str, _safe
 
@@ -206,6 +206,7 @@ def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
     breadth_text = breadth_note = None
     vol_value = None
     vol_label = "VKOSPI(근사·실현변동성)" if market == "KOSPI" else "VIX"
+    kospi_vol_is_vkospi = False  # KOSPI F3가 실제 VKOSPI인지(→ F3 anchor 재보정 분기)
     trailing_per = None
     advancers = decliners = None
     sector_ups = sector_downs = 0
@@ -217,7 +218,15 @@ def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
         advancers, decliners, _breadth_as_of, _breadth_err = _safe(kr_fetcher.fetch_breadth, (None, None, None, None))
         if advancers is not None:
             breadth_text = f"상승 {advancers} · 하락 {decliners}"
-        vol_value = scoring.realized_volatility(level_series, window=20)
+        # F3 변동성: 실제 VKOSPI(코스피200 변동성지수, KRX OpenAPI) 우선 — implied-vol
+        # 지수라 realized-vol 근사보다 정합적. 무키/미신청/실패 시 realized vol로 폴백.
+        vkospi = vkospi_source.fetch_vkospi()
+        if vkospi is not None:
+            vol_value = vkospi
+            vol_label = "VKOSPI"
+            kospi_vol_is_vkospi = True
+        else:
+            vol_value = scoring.realized_volatility(level_series, window=20)
     else:
         nasdaq_sectors = sectors_config["NASDAQ"]["sectors"]
         sector_ups = sector_downs = 0
@@ -311,9 +320,20 @@ def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
         up_ratio = sector_ups / sector_total if sector_total > 0 else None
         fg_vol_input = vix_value
 
+    # F3 anchor 보정: VKOSPI(코스피200 변동성지수)는 이 데이터셋에서 ~20(평온)~95(위기)
+    # 범위라, VIX 기준 anchor(lo12/hi30)면 대부분 0에 saturate. KOSPI가 실제 VKOSPI를
+    # 쓸 때만 in-memory로 F3 anchor를 VKOSPI 분포(lo20/hi80)에 맞춘다(config.json 무수정;
+    # NASDAQ/VIX·realized-vol 폴백 경로는 기존 anchor 그대로).
+    fg_config = config["fear_greed"]
+    if kospi_vol_is_vkospi:
+        import copy
+
+        fg_config = copy.deepcopy(fg_config)
+        fg_config["anchors"]["F3_vol"] = {"lo": 20, "hi": 80, "invert": True}
+
     fear_greed = scoring_ext.fear_greed(
         price=level, sma_125=sma_125, up_ratio=up_ratio,
-        vix_or_vkospi=fg_vol_input, hy_oas=hy_oas, fg_config=config["fear_greed"],
+        vix_or_vkospi=fg_vol_input, hy_oas=hy_oas, fg_config=fg_config,
     )
 
     return MacroInputs(
