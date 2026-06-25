@@ -16,7 +16,7 @@ from unittest.mock import patch
 from backend.api._reference_assembly import assemble_live_reference
 from backend.api.market import _assemble_live
 from backend.store.db import get_connection
-from engine.macro import eps_source, vkospi_source, inputs as macro_inputs
+from engine.macro import eps_source, kospi_level_source, vkospi_source, inputs as macro_inputs
 
 
 def _purge_eps_cache():
@@ -63,6 +63,12 @@ class MacroEquivalenceTests(unittest.TestCase):
         vk_patcher = patch.object(vkospi_source, "fetch_vkospi", return_value=None)
         vk_patcher.start()
         self.addCleanup(vk_patcher.stop)
+        # KOSPI 레벨 KRX OpenAPI 보강도 동일 이유로 중립화 — 동결 오라클은 pykrx→Yahoo
+        # 시리즈 그대로를 쓰므로, KRX_API_KEY가 있는 환경에서 최신점이 붙으면 asOf/level/
+        # 모멘텀이 발산한다. None으로 막아 게이트가 검증하려는 로직 패리티를 유지한다.
+        kl_patcher = patch.object(kospi_level_source, "fetch_latest_kospi_level", return_value=None)
+        kl_patcher.start()
+        self.addCleanup(kl_patcher.stop)
 
     def test_kospi_byte_identical(self):
         new_payload = _assemble_live("KOSPI")

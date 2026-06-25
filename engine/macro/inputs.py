@@ -25,13 +25,15 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+import pandas as pd
+
 import scoring
 from backend import scoring_ext
 from backend.store import db, series_map
 from config_loader import load_config, load_sectors
 from data import kr_fetcher, manual
 from engine.core.timeframes import lookback_days_for, normalize_tf, resample_for_tf, spark_n_for
-from engine.macro import eps_source, vkospi_source
+from engine.macro import eps_source, kospi_level_source, vkospi_source
 
 from backend.api._assembly_helpers import _cached_series, _last, _as_of_str, _safe
 
@@ -153,13 +155,40 @@ def gather_macro_inputs(market: str, tf: str = "1D") -> MacroInputs:
     level = _last(level_series)
     as_of = _as_of_str(level_series) or today.isoformat()
 
+    # ---- KOSPI 레벨 최신 포인트 보강 (engine/macro/kospi_level_source.py) ----
+    # KOSPI 레벨 시리즈는 pykrx→Yahoo(^KS11)로 폴백하는데, 데이터센터 IP(예: GitHub
+    # Actions 러너)에서 yfinance가 1~2일 묵은 값을 준다(Yahoo throttling). KRX
+    # OpenAPI(AUTH_KEY)는 CI에서도 최신 영업일 종가를 안정적으로 주므로, 시리즈 마지막
+    # 날짜보다 더 최신이면 그 한 점을 in-memory로 덧붙여 asOf/level/모멘텀(chg·sma·spark)을
+    # 신선화한다. NEW live input(동결 오라클 범위 밖) → test_macro_equivalence가
+    # fetch_latest_kospi_level를 None으로 monkeypatch해 byte-identical 게이트를 유지한다.
+    # 무키/미신청/실패·시리즈가 이미 더 신선 시 no-op(graceful degrade).
+    kospi_level_spliced = False
+    if market == "KOSPI" and level_series is not None and len(level_series) > 0:
+        _latest = kospi_level_source.fetch_latest_kospi_level()
+        if _latest is not None:
+            _krx_value, _krx_date = _latest
+            _last_ts = level_series.index[-1]
+            _last_d = _last_ts.date() if hasattr(_last_ts, "date") else _last_ts
+            if _krx_date > _last_d:
+                level_series = pd.concat(
+                    [level_series, pd.Series({pd.Timestamp(_krx_date): float(_krx_value)})]
+                ).sort_index()
+                level = _last(level_series)
+                as_of = _as_of_str(level_series) or as_of
+                kospi_level_spliced = True
+
     if market == "KOSPI":
         # series_map stashes which source (KRX vs Yahoo Finance fallback) actually won the
         # last time the KOSPI fetch_fn ran, so we don't need a second live call just for
         # provenance. On a cold process whose DB is already current for today (fetch_fn
         # never ran this request), default to "Yahoo Finance" -- the historically more
         # likely winner given the KRX_ID/KRX_PW auth wall (matches kr_fetcher's own bias).
-        source_label = series_map.last_kospi_index_source["value"] or "Yahoo Finance"
+        # 단, 위에서 KRX OpenAPI 최신점으로 asOf를 보강했다면 그 출처를 표기한다.
+        source_label = (
+            "KRX OpenAPI" if kospi_level_spliced
+            else (series_map.last_kospi_index_source["value"] or "Yahoo Finance")
+        )
         eps_key = "KOSPI_forward_eps"
         anchors = config["multiple_anchors"]["KOSPI"]
     else:
