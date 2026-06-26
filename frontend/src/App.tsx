@@ -105,7 +105,7 @@ function App() {
       <div className="ld-wrap">
         <Header market={market} setMarket={setMarket} pill={payload.pill} asOf={payload.asOf} generatedAt={payload.generatedAt} />
         <CrossNarrativeBadge narrative={payload.narrative} rec={payload.reconciliation} />
-        <FlowSection flow={payload.flow} tf={tf} />
+        <FlowSection flow={payload.flow} tf={tf} market={market} />
         <LiquiditySection
           bands={payload.bands}
           level={payload.flow.level}

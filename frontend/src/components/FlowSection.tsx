@@ -2,15 +2,43 @@
 // types.ts mirrors the prototype's mock shape almost 1:1). Main change is null-safety:
 // fwdPER/trailingPER/breadthText/breadthNote/chgPct/yoyPct/volValue are all nullable on
 // the live backend (no FRED/KRX keys -> breadth fields are null; PER fields need EPS).
+import { useEffect, useState } from "react";
 import { DirIcon } from "./icons";
 import Sparkline from "./Sparkline";
 import { fmt, fmtPct, fmtNum } from "../lib/helpers";
-import type { Flow } from "../api/types";
-import type { Timeframe } from "../api/client";
+import type { Flow, MomentumIc } from "../api/types";
+import { fetchVerification, type Market, type Timeframe } from "../api/client";
 
 interface FlowSectionProps {
   flow: Flow;
   tf: Timeframe;
+  market: Market;
+}
+
+// 추세 경로의 "예측력"을 정직히 표기 — 검증 스코어카드의 momentum_ic(지수 63일 추세수익
+// → 향후 21일 수익 Spearman IC)를 신뢰도 배지로 환산한다. 가격 경로의 모양은 실측상
+// 예측력이 거의 없으므로(KOSPI IC≈+0.06 무신호 · NASDAQ ≈−0.09 약한 역행) "강세/약세"로
+// 단정하지 않고 측정된 신뢰도를 노출한다. IC는 in-sample(검증 v1)이라 더 낙관적임을 명시.
+function reliabilityNote(mi: MomentumIc | null): { text: string; color: string } {
+  if (!mi || mi.ic === null || mi.ic === undefined) {
+    return { text: "예측력 측정 불가", color: "var(--text-faint)" };
+  }
+  const ic = mi.ic;
+  const a = Math.abs(ic);
+  let verdict: string;
+  let color: string;
+  if (a < 0.05) {
+    verdict = "사실상 무신호";
+    color = "var(--text-faint)";
+  } else if (a < 0.1) {
+    verdict = ic > 0 ? "약한 순추세" : "약한 역행(평균회귀)";
+    color = ic > 0 ? "#9bcf5a" : "#e09a4a";
+  } else {
+    verdict = ic > 0 ? "순추세 신호" : "역행 신호(평균회귀)";
+    color = ic > 0 ? "#4caf78" : "#d75f4f";
+  }
+  const n = mi.n ? ` · n=${mi.n}` : "";
+  return { text: `IC ${ic >= 0 ? "+" : ""}${ic.toFixed(2)} · ${verdict}${n}`, color };
 }
 
 // tf-specific spark label + window wording (per plan §FlowSection — spark data itself
@@ -45,7 +73,27 @@ function interpretBreadth(
   return { lv: 1, label: "매우 약함", text: "광범위 동반 하락", color: "#d75f4f", pct };
 }
 
-export default function FlowSection({ flow, tf }: FlowSectionProps) {
+export default function FlowSection({ flow, tf, market }: FlowSectionProps) {
+  // 검증 스코어카드의 측정 momentum_ic를 끌어와 추세 신뢰도 배지로 노출(tf 무관·full-history).
+  // VerificationPanel과 동일 엔드포인트의 중복 GET이지만 KV 캐시라 가벼움(기존 redundant-GET 패턴).
+  const [momentumIc, setMomentumIc] = useState<MomentumIc | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setMomentumIc(null);
+    fetchVerification(market)
+      .then((res) => {
+        if (cancelled) return;
+        const mi = res.scorecard?.momentum_ic;
+        setMomentumIc(mi && "ic" in mi ? mi : null);
+      })
+      .catch(() => {
+        if (!cancelled) setMomentumIc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [market]);
+
   const chgUp = (flow.chgPct ?? 0) >= 0;
   const volUp = flow.volDir === "up";
 
@@ -112,7 +160,7 @@ export default function FlowSection({ flow, tf }: FlowSectionProps) {
       </div>
       <div className="ld-spark-wrap">
         <div className="ld-spark-head">
-          <div className="ld-spark-lab">{SPARK_LABEL[tf]} · 상대형태(절대값 아님)</div>
+          <div className="ld-spark-lab">{SPARK_LABEL[tf]} · 설명용 경로(절대값·예측 아님)</div>
           {sparkWindowPct !== null && (
             <span className={`ld-spark-badge c-${sparkUp ? "up" : "down"}`}>
               <DirIcon dir={sparkUp ? "up" : "down"} size={10} />
@@ -121,6 +169,16 @@ export default function FlowSection({ flow, tf }: FlowSectionProps) {
           )}
         </div>
         <Sparkline data={flow.spark} showStats />
+        {/* 정직성 배지: 가격 경로의 측정 예측력(검증 momentum_ic). "모양"으로 미래를
+            예측하지 말라는 신호 — IC≈0이면 무신호임을 명시. 진짜 신호는 검증 패널로 안내. */}
+        <div className="ld-spark-reliability">
+          <span>
+            추세→향후 21일 예측력(측정): <b style={{ color: reliabilityNote(momentumIc).color }}>{reliabilityNote(momentumIc).text}</b>
+          </span>
+          <span className="ld-spark-rel-caveat">
+            in-sample · 경로 모양은 매매 신호 아님 — 신뢰 가능한 신호는 아래 검증 패널 참고
+          </span>
+        </div>
       </div>
     </div>
   );

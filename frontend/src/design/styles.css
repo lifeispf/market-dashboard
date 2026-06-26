@@ -75,6 +75,9 @@
 .ld-spark-badge.c-down{color:var(--tight)}
 .ld-spark-stats{position:relative}
 .ld-spark-refline{stroke:var(--text-faint);stroke-width:.5;stroke-dasharray:2 2;opacity:.55}
+.ld-spark-reliability{display:flex;flex-direction:column;gap:2px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--text-dim)}
+.ld-spark-reliability b{font-family:var(--mono);font-weight:600}
+.ld-spark-rel-caveat{font-size:9.5px;color:var(--text-faint)}
 .ld-spark-minmax{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--text-faint);margin-top:2px}
 .ld-spark-endpoints{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);margin-top:2px}
 .ld-spark-ep-first{color:var(--text-faint)}
