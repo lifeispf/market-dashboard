@@ -23,6 +23,28 @@ const SPARK_LABEL: Record<Timeframe, string> = {
   "1Y": "최근 추세 · 연봉",
 };
 
+// Breadth 해석(5등급/Lv1~5) — backend breadthNote는 라이브 엔진이 안 채우므로(잔재 필드,
+// 항상 null) 같은 payload의 breadthText("상승 X · 하락 Y" / "섹터 N개 상승 · M개 하락")에서
+// 상승/하락 수를 파싱해 상승비율을 5구간으로 해석한다. 동결 payload·등가성 게이트 무관.
+// 비율 대칭(±20% 강·±8% 중립) — 대시보드 F&G 5존과 일관된 등급 수. 색은 Lv1 빨강 →
+// Lv5 초록 그라데이션(주황·노랑·연두 경유).
+function interpretBreadth(
+  breadthText: string | null,
+): { lv: number; label: string; text: string; color: string; pct: number } | null {
+  if (!breadthText) return null;
+  const nums = breadthText.match(/\d+/g);
+  if (!nums || nums.length < 2) return null;
+  const up = parseInt(nums[0], 10);
+  const down = parseInt(nums[1], 10);
+  if (up + down === 0) return null;
+  const pct = Math.round((up / (up + down)) * 100);
+  if (pct >= 70) return { lv: 5, label: "매우 강함", text: "광범위 동반 상승", color: "#4caf78", pct };
+  if (pct >= 58) return { lv: 4, label: "강함", text: "상승 우위", color: "#9bcf5a", pct };
+  if (pct >= 42) return { lv: 3, label: "중립", text: "혼조 · 방향성 약함", color: "#dcc24e", pct };
+  if (pct >= 30) return { lv: 2, label: "약함", text: "하락 우위", color: "#e09a4a", pct };
+  return { lv: 1, label: "매우 약함", text: "광범위 동반 하락", color: "#d75f4f", pct };
+}
+
 export default function FlowSection({ flow, tf }: FlowSectionProps) {
   const chgUp = (flow.chgPct ?? 0) >= 0;
   const volUp = flow.volDir === "up";
@@ -67,7 +89,17 @@ export default function FlowSection({ flow, tf }: FlowSectionProps) {
           <div className="v" style={{ fontSize: 15 }}>
             {flow.breadthText || "N/A"}
           </div>
-          <div className="c c-flat">{flow.breadthNote || "데이터 없음"}</div>
+          {(() => {
+            // breadthNote(서버)가 있으면 그대로, 없으면 breadthText에서 상승비율을 5등급 해석.
+            if (flow.breadthNote) return <div className="c c-flat">{flow.breadthNote}</div>;
+            const b = interpretBreadth(flow.breadthText);
+            if (!b) return <div className="c c-flat">데이터 없음</div>;
+            return (
+              <div className="c" style={{ color: b.color }} title={`상승비율 ${b.pct}%`}>
+                Lv{b.lv} {b.label} · {b.text}
+              </div>
+            );
+          })()}
         </div>
         <div className="ld-kpi">
           <div className="l">{flow.volLabel}</div>
