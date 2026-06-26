@@ -38,16 +38,28 @@ class SectorRulebook:
     def interpret(self, modules: "list[ModuleOutput]", upstream: "Context") -> Verdict:
         rs = next((m for m in modules if m.module_id == "sector.relative_strength"), None)
 
+        macro_v = upstream.upstream.get("macro") if upstream else None
+        macro_lead = (macro_v.lead_pattern or macro_v.direction) if macro_v is not None else None
+
+        # 룰베이스 추론 콘텐츠(Why/supports/risks/invalidation) — 방어적.
+        try:
+            from engine.sector.reasoning import build_sector_reasoning
+
+            r = build_sector_reasoning(rs, macro_lead)
+        except Exception:
+            r = {"narrative": "섹터 판단 보류.", "supports": [], "risks": [], "invalidation": []}
+
         if rs is None or rs.state is None:
             return Verdict(
                 direction="neutral", strength=0, conviction=None, lead_pattern=None,
-                narrative="섹터 상대강도 관측 불가 — 판단 보류.",
-                risks=["no_data"], invalidation=[], horizon="T1", verified=False,
+                narrative=r["narrative"], risks=r["risks"] or ["no_data"], invalidation=r["invalidation"],
+                horizon="T1", verified=False,
                 extra={
                     "observed_modules": [m.module_id for m in modules],
                     "risk_profile": rs.inputs.get("risk_profile") if rs is not None else None,
                     "rrg_by_window": rs.inputs.get("rrg_by_window") if rs is not None else None,
                     "rrg_consensus": rs.inputs.get("rrg_consensus") if rs is not None else None,
+                    "supports": r["supports"],
                 },
             )
 
@@ -58,25 +70,14 @@ class SectorRulebook:
                 rs.state, ("neutral", 2, None)
             )
 
-        macro_v = upstream.upstream.get("macro") if upstream else None
-        macro_note = ""
-        if macro_v is not None:
-            macro_note = f" (macro regime: {macro_v.lead_pattern or macro_v.direction})"
-
-        risks: list[str] = []
-        if rs.transition == "Weakening":
-            risks.append("모멘텀 둔화 — 차익 임박")
-        if rs.state == "Emerging":
-            risks.append("상대강도 미확인 — Breadth/Participation 검증 필요")
-
         return Verdict(
             direction=direction,
             strength=strength,
             conviction=None,  # §9.1 비검증 — Breadth/Participation 추가 전까지 랭킹 신호일 뿐
             lead_pattern=pattern,
-            narrative=(rs.narrative or "") + macro_note,
-            risks=risks,
-            invalidation=[],
+            narrative=r["narrative"],
+            risks=r["risks"],
+            invalidation=r["invalidation"],
             horizon="T1",
             verified=False,
             extra={
@@ -88,5 +89,6 @@ class SectorRulebook:
                 "risk_profile": rs.inputs.get("risk_profile"),
                 "rrg_by_window": rs.inputs.get("rrg_by_window"),
                 "rrg_consensus": rs.inputs.get("rrg_consensus"),
+                "supports": r["supports"],
             },
         )

@@ -82,7 +82,8 @@ class SectorRelativeStrengthMappingTests(unittest.TestCase):
         )
         ctx = Context(market="KOSPI", upstream={"macro": macro_verdict})
         out = engine.run("semi", ctx, data=row)
-        self.assertIn("macro regime", out.verdict.narrative)
+        # 추론 재구성(engine/sector/reasoning.py) 후 macro 참조는 "· macro: {lead}" 형식.
+        self.assertIn("macro:", out.verdict.narrative)
 
 
 class SectorRiskProfileClassificationTests(unittest.TestCase):

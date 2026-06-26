@@ -26,6 +26,7 @@ import type {
   Sector,
   SectorLeaders,
   TrailPoint,
+  Verdict,
 } from "../api/types";
 
 // Phase E (now tf-scaled): the multi-window RRG horizon labels are no longer a fixed
@@ -172,12 +173,15 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
   // #1 트리맵 tf 색 + #2/#3 모든 섹터 주도주 — 비동결 envelope verdict.extra에서 읽는다.
   const periodReturnByCode: Record<string, number | null | undefined> = {};
   const constituentsByCode: Record<string, Constituent[]> = {};
+  // DI-2: 섹터 룰베이스 추론(Why/Counter)을 선택 섹터 카드에 노출 — verdict 자체를 보관.
+  const verdictByCode: Record<string, Verdict | undefined> = {};
   for (const o of sectorEnvelopes ?? []) {
     const extra = o.verdict?.extra;
     rrgByWindowByCode[o.entity_id] = extra?.rrg_by_window as Record<string, RrgWindowEntry | null> | undefined;
     rrgConsensusByCode[o.entity_id] = extra?.rrg_consensus as RrgConsensus | null | undefined;
     periodReturnByCode[o.entity_id] = extra?.period_return as number | null | undefined;
     constituentsByCode[o.entity_id] = (extra?.constituents as Constituent[] | undefined) ?? [];
+    verdictByCode[o.entity_id] = o.verdict;
   }
 
   const nameByTicker = buildNameByTicker(leaders);
@@ -341,6 +345,46 @@ export default function LeadershipSection({ sectors, leaders, market, tf, histor
             {sel.name} · {quadKr(sel.quadrant)}
           </div>
           <div className="ld-hint">섹터를 클릭하면 종목 정보가 바뀝니다. 카드를 클릭하면 상세가 펼쳐집니다.</div>
+          {/* DI-2: 선택 섹터의 룰베이스 Why/Counter(엔진 sector reasoning) — 동결 payload 무관. */}
+          {(() => {
+            const sv = verdictByCode[sel.code];
+            if (!sv) return null;
+            const supports = (sv.extra?.supports as string[] | undefined) ?? [];
+            return (
+              <details className="ld-exec-why ld-sec-why">
+                <summary>왜? · {sv.lead_pattern || quadKr(sel.quadrant)} 근거 (찬성 ↔ 반대)</summary>
+                {sv.narrative && <div className="ld-exec-narr">{sv.narrative}</div>}
+                <div className="ld-exec-debate">
+                  <div className="ld-exec-col">
+                    <div className="ld-exec-col-h up">찬성</div>
+                    {supports.length ? (
+                      supports.map((s, i) => (
+                        <div className="ld-exec-pt up" key={i}>+ {s}</div>
+                      ))
+                    ) : (
+                      <div className="ld-exec-empty">—</div>
+                    )}
+                  </div>
+                  <div className="ld-exec-col">
+                    <div className="ld-exec-col-h down">반대 (Counter)</div>
+                    {sv.risks.length ? (
+                      sv.risks.map((r, i) => (
+                        <div className="ld-exec-pt down" key={i}>− {r}</div>
+                      ))
+                    ) : (
+                      <div className="ld-exec-empty">—</div>
+                    )}
+                  </div>
+                </div>
+                {sv.invalidation.length > 0 && (
+                  <div className="ld-exec-invalid">
+                    <b>무효화</b> · {sv.invalidation.join(" · ")}
+                  </div>
+                )}
+                <div className="ld-exec-caveat">룰베이스 추론 · 비검증 휴리스틱 · RRG 단일윈도우 근사</div>
+              </details>
+            );
+          })()}
           {displayLeaders.length > 0 ? (
             <>
               <div className="ld-cards">
