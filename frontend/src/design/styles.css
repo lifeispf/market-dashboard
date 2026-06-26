@@ -362,6 +362,15 @@
 .vc-risks{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:2px}
 .vc-risks li{font-size:11.5px;color:var(--tight);line-height:1.4}
 
+/* DI-3 실행 레벨(투명 룰 · 투자자문 아님) */
+.vc-action{margin-top:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+.vc-action-h{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text-faint);margin-bottom:5px}
+.vc-action-row{display:flex;gap:8px;font-size:11.5px;line-height:1.5}
+.vc-action-row .k{flex:0 0 32px;color:var(--text-faint)}
+.vc-action-row .val{color:var(--text-dim)}
+.vc-action-row .val em{font-style:normal;color:var(--text-faint);font-size:10px}
+.vc-action-disc{margin-top:6px;font-size:9.5px;color:#d98f7e;font-style:italic}
+
 .vc-modules{display:flex;flex-direction:column;gap:8px;margin-top:3px;border-top:1px solid var(--line-soft);padding-top:10px}
 .mc-card{background:var(--panel-2);border-radius:5px;padding:9px 11px;display:flex;flex-direction:column;gap:5px}
 .mc-degraded{opacity:.6}

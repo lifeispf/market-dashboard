@@ -63,7 +63,8 @@ class StockPriceStructureModule:
                 module_id=self.id, state=None, transition=None, strength=None,
                 confidence=None, narrative="가격 구조 데이터 없음(추세 산정 불가).",
                 inputs={"trend_dir": data.trend_dir, "above_ma200": data.above_ma200,
-                        "vol": data.vol, "approximation": "trend_ma_vol_only"},
+                        "vol": data.vol, "approximation": "trend_ma_vol_only",
+                        "price": data.price, "ma200": data.ma200, "low_20": data.low_20},
             )
         ma_txt = "200MA 위" if data.above_ma200 else ("200MA 아래" if data.above_ma200 is not None else "200MA 미상")
         narrative = f"{state} — 추세 {data.trend_dir}, {ma_txt}."
@@ -71,5 +72,6 @@ class StockPriceStructureModule:
             module_id=self.id, state=state, transition=_TREND_TRANSITION.get(data.trend_dir),
             strength=strength, confidence=None, narrative=narrative,
             inputs={"trend_dir": data.trend_dir, "above_ma200": data.above_ma200,
-                    "vol": data.vol, "approximation": "trend_ma_vol_only"},
+                    "vol": data.vol, "approximation": "trend_ma_vol_only",
+                    "price": data.price, "ma200": data.ma200, "low_20": data.low_20},
         )

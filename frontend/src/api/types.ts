@@ -181,6 +181,18 @@ export interface StocksResponse {
   stocks: EngineOutput[];
 }
 
+// DI-3 Action levels (NOT frozen) — stock verdict.extra.action. 투명 룰 기반 진입/손절/비중.
+// ⚠️ 투자자문 아님 · 비검증 휴리스틱(walk-forward 전) — UI는 항상 disclaimer와 함께 표시.
+export interface ActionLevels {
+  entry: string;
+  stop: number | null;
+  stop_pct: number | null;
+  stop_rule: string | null;
+  weight_pct: number;
+  weight_rule: string;
+  disclaimer: string;
+}
+
 // Decision-Intelligence briefing (NOT frozen) — GET /api/briefing/{market}. Full
 // macro→sector→stock cascade + a rule-based Layer-0 Executive Summary. The summary
 // and the macro verdict's narrative/risks/extra.supports power the "What→Why→Meaning"

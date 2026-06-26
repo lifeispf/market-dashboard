@@ -52,6 +52,9 @@ class StockRow:
     sector_rs_ratio: float | None = None
     sector_rs_momentum: float | None = None
     sector_quadrant: str | None = None
+    # DI-3 Action: 투명 룰 손절 레벨용(MA200 값·최근 20일 저점). 동결 payload 무관(envelope 전용).
+    ma200: float | None = None
+    low_20: float | None = None
 
 
 def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
@@ -139,9 +142,13 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
             trend_dir = scoring.trend_direction(full_series, lookback=5) if full_series is not None else None
             vol = scoring.realized_volatility(full_series, window=20) if full_series is not None else None
             above_ma200 = None
+            ma200 = None
+            low_20 = None
             if full_series is not None and len(full_series) >= 200 and price is not None:
                 ma200 = float(full_series.iloc[-200:].mean())
                 above_ma200 = price >= ma200
+            if full_series is not None and len(full_series) >= 20:
+                low_20 = float(full_series.iloc[-20:].min())
 
             rows.append(
                 StockRow(
@@ -160,6 +167,8 @@ def gather_stock_inputs(market: str, tf: str = "1D") -> list[StockRow]:
                     sector_rs_ratio=sector_rs_r,
                     sector_rs_momentum=sector_rs_m,
                     sector_quadrant=sector_quadrant,
+                    ma200=ma200,
+                    low_20=low_20,
                 )
             )
 

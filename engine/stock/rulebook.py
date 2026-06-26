@@ -102,6 +102,20 @@ class StockRulebook:
         narr_bits = [b for b in [rs.narrative if rs else None, ps.narrative if ps else None] if b]
         narrative = " / ".join(narr_bits) + cascade_note
 
+        # DI-3 Action(가드레일드): 투명 룰 진입/손절/비중. 투자자문 아님·비검증 — 프론트가
+        # 디스클레이머 동반 표시. 방어적(실패/데이터부족 시 None). envelope 전용(동결 무관).
+        ps_in = ps.inputs if ps else {}
+        try:
+            from engine.stock.action import build_action_levels
+
+            action = build_action_levels(
+                price=ps_in.get("price"), ma200=ps_in.get("ma200"), low_20=ps_in.get("low_20"),
+                vol_annual_pct=ps_in.get("vol"), above_ma200=ps_in.get("above_ma200"),
+                struct_state=struct_state, size_hint=size,
+            )
+        except Exception:
+            action = None
+
         return Verdict(
             direction=direction, strength=strength,
             conviction=None,  # §9.1 비검증 — Quality/Expectation 추가 전까지 랭킹 신호일 뿐
@@ -117,5 +131,6 @@ class StockRulebook:
                 "sector_rs_ratio": rs.inputs.get("sector_rs_ratio") if rs else None,
                 "sector_rs_momentum": rs.inputs.get("sector_rs_momentum") if rs else None,
                 "sector_quadrant": rs.inputs.get("sector_quadrant") if rs else None,
+                "action": action,
             },
         )

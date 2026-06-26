@@ -3,7 +3,7 @@
 // here. Shows direction/strength/lead_pattern/conviction(+verified gate)/
 // narrative/risks. The `verified` flag (§9.1) is load-bearing: until walk-forward
 // backtesting lands, conviction is an unverified heuristic and is labeled as such.
-import type { EngineOutput } from "../api/types";
+import type { ActionLevels, EngineOutput } from "../api/types";
 import { directionColor, DIRECTION_KR, DIRECTION_ARROW, sizeHint } from "../lib/helpers";
 import ModuleCard from "./ModuleCard";
 
@@ -61,6 +61,36 @@ export default function VerdictCard({ output, title }: VerdictCardProps) {
           ))}
         </ul>
       )}
+
+      {/* DI-3 실행 레벨(투명 룰) — 항상 disclaimer 동반. 투자자문 아님. */}
+      {(() => {
+        const a = v.extra?.action as ActionLevels | null | undefined;
+        if (!a) return null;
+        return (
+          <div className="vc-action">
+            <div className="vc-action-h">실행 · 기계적 룰</div>
+            <div className="vc-action-row">
+              <span className="k">진입</span>
+              <span className="val">{a.entry}</span>
+            </div>
+            {a.stop !== null && (
+              <div className="vc-action-row">
+                <span className="k">손절</span>
+                <span className="val">
+                  {a.stop.toLocaleString()} <em>({a.stop_pct}%)</em> · {a.stop_rule}
+                </span>
+              </div>
+            )}
+            <div className="vc-action-row">
+              <span className="k">비중</span>
+              <span className="val">
+                {a.weight_pct}% <em>· {a.weight_rule}</em>
+              </span>
+            </div>
+            <div className="vc-action-disc">⚠ {a.disclaimer}</div>
+          </div>
+        );
+      })()}
 
       {output.modules.length > 0 && (
         <div className="vc-modules">
