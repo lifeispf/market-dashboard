@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from engine.cascade import run_cascade
+from engine.macro.reasoning import build_executive_summary
 
 router = APIRouter()
 
@@ -28,4 +29,9 @@ def get_briefing(market: str):
         cascade = run_cascade(market)
     except Exception as exc:  # never 500 — graceful degradation(§9.3)
         raise HTTPException(status_code=503, detail=f"briefing assembly failed: {exc}")
-    return {"tier": "briefing", **cascade.to_dict()}
+    # Layer0 Executive Summary(룰베이스 합성) — 가산이라 실패해도 캐스케이드는 반환.
+    try:
+        summary = build_executive_summary(cascade.macro, cascade.sectors)
+    except Exception:
+        summary = {"headline": "산정 불가", "lines": []}
+    return {"tier": "briefing", "summary": summary, **cascade.to_dict()}

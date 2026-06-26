@@ -45,6 +45,7 @@ def build_entries(generated_at: str) -> list[dict]:
     from backend.api.sectors import get_sectors
     from backend.api.stocks import get_stocks
     from backend.api.verification import get_verification
+    from backend.api.briefing import get_briefing
     from backend.api.health import health
 
     entries: list[dict] = []
@@ -69,6 +70,8 @@ def build_entries(generated_at: str) -> list[dict]:
             add(f"stocks:{m}:{tf}", lambda m=m, tf=tf: get_stocks(m, tf))
             add(f"history:{m}:{tf}", lambda m=m, tf=tf: get_history(m, tf))
         add(f"verification:{m}", lambda m=m: get_verification(m))
+        # briefing(캐스케이드 + Layer0 요약)은 tf 무관 — Decision Intelligence 표현의 데이터 소스.
+        add(f"briefing:{m}", lambda m=m: get_briefing(m))
     add("health", lambda: health())
 
     if failures:

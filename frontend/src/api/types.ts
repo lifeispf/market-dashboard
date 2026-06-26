@@ -181,6 +181,29 @@ export interface StocksResponse {
   stocks: EngineOutput[];
 }
 
+// Decision-Intelligence briefing (NOT frozen) — GET /api/briefing/{market}. Full
+// macro→sector→stock cascade + a rule-based Layer-0 Executive Summary. The summary
+// and the macro verdict's narrative/risks/extra.supports power the "What→Why→Meaning"
+// presentation (Layer 0 + counter-evidence), distinct from the frozen MarketPayload.
+export interface SummaryLine {
+  label: string;
+  value: string;
+  tone: "up" | "down" | "flat";
+}
+export interface ExecutiveSummary {
+  headline: string;
+  lines: SummaryLine[];
+  lead_sector?: string | null;
+}
+export interface BriefingResponse {
+  tier: "briefing";
+  market: "KOSPI" | "NASDAQ";
+  summary: ExecutiveSummary;
+  macro: EngineOutput;
+  sectors: EngineOutput[];
+  stocks: EngineOutput[];
+}
+
 // Sector constituent (NOT frozen) — additive on the /api/sectors envelope verdict.extra.
 // Fills leading-stocks for ALL sectors (curated leaders cover only ~2/market): NASDAQ
 // from sector-ETF holdings (note = weight), KOSPI from an authored ticker→sector map

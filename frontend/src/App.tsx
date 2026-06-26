@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { fetchHistory, fetchMarket, type Market, type Timeframe } from "./api/client";
-import type { HistoryResponse, MarketPayload } from "./api/types";
+import { fetchBriefing, fetchHistory, fetchMarket, type Market, type Timeframe } from "./api/client";
+import type { BriefingResponse, HistoryResponse, MarketPayload } from "./api/types";
 import "./design/styles.css";
 
 import GlobalMacroBar from "./components/GlobalMacroBar";
+import ExecutiveSummary from "./components/ExecutiveSummary";
 import Header from "./components/Header";
 import TimeframeSelector from "./components/TimeframeSelector";
 import CrossNarrativeBadge from "./components/CrossNarrativeBadge";
@@ -27,6 +28,7 @@ function App() {
   const [data, setData] = useState<MarketPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [briefing, setBriefing] = useState<BriefingResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +69,24 @@ function App() {
     };
   }, [market, tf]);
 
+  // Layer 0 Executive Summary + Why/Counter — /api/briefing(룰베이스 캐스케이드 + 합성),
+  // tf 무관. 실패 시 null로 degrade(ExecutiveSummary 미렌더, 나머지 대시보드는 그대로).
+  useEffect(() => {
+    let cancelled = false;
+    setBriefing(null);
+    fetchBriefing(market)
+      .then((res) => {
+        if (cancelled) return;
+        setBriefing(res);
+      })
+      .catch(() => {
+        if (!cancelled) setBriefing(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [market]);
+
   // Guard against a stale payload from the previous market flashing while the new
   // market's fetch is in flight (the cancelled-aware effect above clears `error` but
   // intentionally leaves the old `data` in place momentarily; this gate prevents it
@@ -104,6 +124,7 @@ function App() {
       <TimeframeSelector tf={tf} setTf={setTf} />
       <div className="ld-wrap">
         <Header market={market} setMarket={setMarket} pill={payload.pill} asOf={payload.asOf} generatedAt={payload.generatedAt} />
+        {briefing && briefing.market === market && <ExecutiveSummary briefing={briefing} />}
         <CrossNarrativeBadge narrative={payload.narrative} rec={payload.reconciliation} />
         <FlowSection flow={payload.flow} tf={tf} market={market} />
         <LiquiditySection

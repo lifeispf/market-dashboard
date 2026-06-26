@@ -85,16 +85,30 @@ class MacroRulebook:
         direction = _REGIME_TO_DIRECTION.get(regime, "neutral")
         strength = _DIRECTION_STRENGTH.get(direction, 2)
 
-        narrative = REGIME_LABEL.get(regime, "산정 불가") if regime else "산정 불가"
+        # 룰베이스 추론 콘텐츠(Why/risks/invalidation/supports) — 측정 팩터에서 규칙 생성.
+        # 결정적·감사가능. legacy 어댑터는 verdict.narrative/risks/invalidation/extra["supports"]를
+        # 읽지 않으므로 동결 payload·등가성 게이트와 무관(envelope 전용). 방어적으로 — 추론이
+        # 어떤 이유로든 실패해도 extra(동결 payload가 읽는 키)는 항상 유효해야 한다.
+        try:
+            from engine.macro.reasoning import build_macro_reasoning
+
+            reasoning = build_macro_reasoning(data)
+        except Exception:
+            reasoning = {
+                "narrative": REGIME_LABEL.get(regime, "산정 불가") if regime else "산정 불가",
+                "supports": [],
+                "risks": [],
+                "invalidation": [],
+            }
 
         return Verdict(
             direction=direction,
             strength=strength,
             conviction=None,  # macro는 비검증 휴리스틱 영역 -- 임의 conviction 금지
             lead_pattern=regime,
-            narrative=narrative,
-            risks=[],
-            invalidation=[],
+            narrative=reasoning["narrative"],
+            risks=reasoning["risks"],
+            invalidation=reasoning["invalidation"],
             horizon="T1",
             verified=False,
             extra={
@@ -107,5 +121,6 @@ class MacroRulebook:
                 "position": data.position,
                 "levels": data.levels,
                 "fear_greed": data.fear_greed,
+                "supports": reasoning["supports"],
             },
         )

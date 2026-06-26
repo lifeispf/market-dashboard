@@ -1,4 +1,4 @@
-import type { HistoryResponse, MarketPayload, SectorsResponse, StocksResponse, VerificationResponse } from "./types";
+import type { BriefingResponse, HistoryResponse, MarketPayload, SectorsResponse, StocksResponse, VerificationResponse } from "./types";
 
 export type Market = "KOSPI" | "NASDAQ";
 
@@ -40,6 +40,14 @@ export async function fetchHistory(market: Market, tf: Timeframe = "1D"): Promis
 export async function fetchVerification(market: Market): Promise<VerificationResponse> {
   const res = await fetch(`/api/verification/${market}`);
   if (!res.ok) throw new Error(`API ${res.status} for verification ${market}`);
+  return res.json();
+}
+
+// Decision-Intelligence briefing — GET /api/briefing/{market}. tf-independent
+// (full cascade + Layer-0 summary). Powers the Executive Summary + Why/Counter panel.
+export async function fetchBriefing(market: Market): Promise<BriefingResponse> {
+  const res = await fetch(`/api/briefing/${market}`);
+  if (!res.ok) throw new Error(`API ${res.status} for briefing ${market}`);
   return res.json();
 }
 
