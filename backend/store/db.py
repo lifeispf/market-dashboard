@@ -22,6 +22,22 @@ CREATE TABLE IF NOT EXISTS series_daily (
 );
 CREATE INDEX IF NOT EXISTS idx_series_daily_lookup ON series_daily(series_id, date);
 
+CREATE TABLE IF NOT EXISTS series_ohlc_daily (
+    series_id        TEXT NOT NULL,
+    date             TEXT NOT NULL,
+    open             REAL,
+    high             REAL,
+    low              REAL,
+    close            REAL,
+    volume           REAL,
+    source           TEXT NOT NULL,
+    open_fetched_at  TEXT,
+    close_fetched_at TEXT,
+    fetched_at       TEXT NOT NULL,
+    PRIMARY KEY (series_id, date)
+);
+CREATE INDEX IF NOT EXISTS idx_series_ohlc_lookup ON series_ohlc_daily(series_id, date);
+
 CREATE TABLE IF NOT EXISTS scores_daily (
     market      TEXT NOT NULL,
     date        TEXT NOT NULL,
@@ -115,6 +131,118 @@ def read_series(series_id, lookback_days=None):
     if lookback_days and len(out) > lookback_days:
         out = out[-lookback_days:]
     return out
+
+
+# ---- series_ohlc_daily ----
+
+def _to_float_or_none(value):
+    if value is None:
+        return None
+    try:
+        result = float(value)
+        return None if result != result else result
+    except (TypeError, ValueError):
+        return None
+
+
+def upsert_ohlc_series(series_id, points, source, fetched_at, phase=None):
+    """Persist OHLC rows without letting an open capture overwrite close fields.
+
+    phase:
+      - "open": update only the open column/open_fetched_at.
+      - "close": update close/high/low/volume, and fill open if present.
+      - None: historical/snapshot load; update all OHLC fields.
+    """
+    rows = []
+    phase = phase if phase in ("open", "close") else None
+    for point in points:
+        if isinstance(point, dict):
+            d = point.get("date")
+            open_v = point.get("open")
+            high_v = point.get("high")
+            low_v = point.get("low")
+            close_v = point.get("close")
+            volume_v = point.get("volume")
+        else:
+            d, open_v, high_v, low_v, close_v, volume_v = point
+        if d is None:
+            continue
+
+        if phase == "open":
+            high_v = low_v = close_v = volume_v = None
+            open_fetched_at = fetched_at
+            close_fetched_at = None
+        elif phase == "close":
+            open_fetched_at = None
+            close_fetched_at = fetched_at
+        else:
+            open_fetched_at = fetched_at
+            close_fetched_at = fetched_at
+
+        if all(v is None for v in (open_v, high_v, low_v, close_v, volume_v)):
+            continue
+        d_iso = d.isoformat() if hasattr(d, "isoformat") else str(d)
+        rows.append((
+            series_id,
+            d_iso,
+            _to_float_or_none(open_v),
+            _to_float_or_none(high_v),
+            _to_float_or_none(low_v),
+            _to_float_or_none(close_v),
+            _to_float_or_none(volume_v),
+            source,
+            open_fetched_at,
+            close_fetched_at,
+            fetched_at,
+        ))
+    if not rows:
+        return 0
+    with get_connection() as conn:
+        conn.executemany(
+            "INSERT INTO series_ohlc_daily "
+            "(series_id, date, open, high, low, close, volume, source, "
+            "open_fetched_at, close_fetched_at, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(series_id, date) DO UPDATE SET "
+            "open=COALESCE(series_ohlc_daily.open, excluded.open), "
+            "high=COALESCE(excluded.high, series_ohlc_daily.high), "
+            "low=COALESCE(excluded.low, series_ohlc_daily.low), "
+            "close=COALESCE(excluded.close, series_ohlc_daily.close), "
+            "volume=COALESCE(excluded.volume, series_ohlc_daily.volume), "
+            "source=excluded.source, "
+            "open_fetched_at=COALESCE(series_ohlc_daily.open_fetched_at, excluded.open_fetched_at), "
+            "close_fetched_at=COALESCE(excluded.close_fetched_at, series_ohlc_daily.close_fetched_at), "
+            "fetched_at=excluded.fetched_at",
+            rows,
+        )
+    return len(rows)
+
+
+def read_ohlc_series(series_id, lookback_days=None):
+    sql = (
+        "SELECT date, open, high, low, close, volume, source, open_fetched_at, "
+        "close_fetched_at, fetched_at FROM series_ohlc_daily "
+        "WHERE series_id = ? ORDER BY date ASC"
+    )
+    with get_connection() as conn:
+        rows = conn.execute(sql, (series_id,)).fetchall()
+    if lookback_days and len(rows) > lookback_days:
+        rows = rows[-lookback_days:]
+    return [
+        {
+            "date": d,
+            "open": open_v,
+            "high": high_v,
+            "low": low_v,
+            "close": close_v,
+            "volume": volume_v,
+            "source": source,
+            "open_fetched_at": open_fetched_at,
+            "close_fetched_at": close_fetched_at,
+            "fetched_at": fetched_at,
+        }
+        for d, open_v, high_v, low_v, close_v, volume_v, source, open_fetched_at, close_fetched_at, fetched_at in rows
+    ]
 
 
 # ---- scores_daily ----

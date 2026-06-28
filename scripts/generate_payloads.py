@@ -24,6 +24,7 @@ import os
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 # Make the repo root importable (so `backend`/`engine` resolve) regardless of CWD —
 # this script lives in scripts/ which would otherwise be the only path entry.
@@ -81,6 +82,28 @@ def build_entries(generated_at: str) -> list[dict]:
     return entries
 
 
+def _normalize_refresh_phase(raw: str | None):
+    phase = (raw or "").strip().lower()
+    return phase if phase in ("open", "close") else None
+
+
+def refresh_daily_ohlc(phase=None):
+    """Persist daily OHLC snapshots before building KV payloads."""
+    from backend.store import ingest
+    from data import us_fetcher
+
+    market_today = datetime.now(ZoneInfo("America/New_York")).date()
+
+    def _nasdaq_fetch_fn(lookback_days):
+        rows, _error = us_fetcher.fetch_ohlc_series("nasdaq_composite", period=f"{max(lookback_days, 5)}d")
+        if phase in ("open", "close"):
+            rows = [row for row in rows if row.get("date") == market_today]
+        return rows
+
+    rows = ingest.refresh_ohlc_series("^IXIC", _nasdaq_fetch_fn, "yfinance", lookback_days=5, phase=phase)
+    print(f"  OHLC ^IXIC rows written: {rows} (phase={phase or 'snapshot'})")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Generate Cloudflare KV bulk payloads from the FastAPI route functions.")
     parser.add_argument("--out", default="kv_payloads.json", help="Output bulk JSON path.")
@@ -91,6 +114,7 @@ def main(argv=None):
     # ("no such table: series_daily"). 명시적으로 스키마를 보장한다.
     from backend.store import db
     db.init_db()
+    refresh_daily_ohlc(_normalize_refresh_phase(os.environ.get("MARKET_SNAPSHOT_PHASE")))
 
     # 스냅샷 생성 시각(KST). market payload에 주입돼 프론트 '갱신 {날짜 시각} KST'로 표기.
     # (Action 매 실행마다 갱신되는 유일한 시각 신호 — asOf는 거래일이라 장중 불변.)

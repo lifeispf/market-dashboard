@@ -11,7 +11,8 @@ on:
     - cron: "0 22 * * *"   # 07:00 KST (전일 22:00 UTC) — 美 종가 정착 후(EDT/EST 양쪽 마감 후)
     - cron: "0 0 * * *"    # 09:00 KST (00:00 UTC) — KOSPI 개장 직전(美 반영)
     - cron: "30 6 * * *"   # 15:30 KST (06:30 UTC) — KOSPI 마감
-    - cron: "30 13 * * *"  # 22:30 KST (13:30 UTC) — KOSPI 종가 정착 후
+    - cron: "45 13 * * *"  # 22:45 KST (13:45 UTC) — NASDAQ 개장 후 시가 캡처(서머타임)
+    - cron: "45 14 * * *"  # 23:45 KST (14:45 UTC) — NASDAQ 개장 후 시가 캡처(표준시)
   workflow_dispatch: {}  # 수동 실행 버튼
 
 concurrency:
@@ -43,6 +44,14 @@ jobs:
           key: dashboard-db-${{ github.run_id }}
           restore-keys: |
             dashboard-db-
+
+      - name: Choose refresh phase
+        run: |
+          case "${{ github.event.schedule }}" in
+            "0 22 * * *") echo "MARKET_SNAPSHOT_PHASE=close" >> "$GITHUB_ENV" ;;
+            "45 13 * * *"|"45 14 * * *") echo "MARKET_SNAPSHOT_PHASE=open" >> "$GITHUB_ENV" ;;
+            *) echo "MARKET_SNAPSHOT_PHASE=snapshot" >> "$GITHUB_ENV" ;;
+          esac
 
       - name: Generate payloads
         env:
